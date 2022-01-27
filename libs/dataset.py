@@ -62,9 +62,16 @@ class AbstractDataset:
 
 class CamelUSDataset(AbstractDataset):
     def __init__(self, forcings: pd.DataFrame, streamflow: pd.DataFrame, feature_cols: list, target_cols: list,
-                 start_time: str = None, end_time: str = None):
-        super().__init__(forcings[start_time:end_time][feature_cols],
-                         streamflow[start_time:end_time][target_cols])
+                 start_date: str = None, end_date: str = None):
+
+        # Ensure that both DataFrames cover the full specified timespan. No need to worry about NaN values at this
+        # point, since they will be discarded for training.
+        date_range = pd.date_range(start=start_date, end=end_date, freq="1D")
+        forcings = forcings[start_date:end_date][feature_cols].reindex(date_range)
+        streamflow = streamflow[start_date:end_date][target_cols].reindex(date_range)
+
+        super().__init__(forcings[start_date:end_date][feature_cols],
+                         streamflow[start_date:end_date][target_cols])
 
 
 def factory(forcings, streamflow, dataset_type: str, feature_cols: list, target_cols: list,
