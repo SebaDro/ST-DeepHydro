@@ -62,6 +62,118 @@ def discover_files_for_basins(data_dir: str, basins: list) -> dict:
     return file_dict
 
 
+def discover_single_camels_us_forcings_file(data_dir: str, forcings_type: str, basin: str):
+    """
+    Discovers a single CAMELS-US forcing file by using the pattern '{data_dir}/**/{basin}_lump_{forcings_type}_forcing_leap.txt'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the CAMELS-US data directory for forcings.
+    forcings_type: str
+        Type of the forcings timeseries, i.e. one of 'daymet', 'maurer', or 'nldas'
+    basin: str
+        ID of the basin, the forcings file will be discovered for.
+
+    Returns
+    -------
+    str
+        Path to the discovered forcings file
+
+    """
+    type_dict = {"daymet": "cida", "maurer": "maurer", "nldas": "nldas"}
+    if forcings_type in type_dict:
+        files = glob.glob(f"{data_dir}/**/{basin}_lump_{type_dict[forcings_type]}_forcing_leap.txt", recursive=True)
+        if len(files) == 0:
+            raise FileNotFoundError(f"Can't find file for basin {basin} within directory {data_dir}.")
+        if len(files) > 1:
+            logger.warning(f"Found multiple files for basin {basin} within directory {data_dir}. "
+                           f"First one found will be returned.")
+    else:
+        raise ValueError(f"Invalid forcings type `{forcings_type}` specified.")
+    return files[0]
+
+
+def discover_single_camels_us_streamflow_file(data_dir: str, basin: str):
+    """
+    Discovers a single CAMELS-US streamflow file by using the pattern '{data_dir}/**/{basin}_streamflow_qc.txt'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the CAMELS-US data directory for streamflow.
+    basin: str
+        ID of the basin, the streamflow file will be discovered for.
+
+    Returns
+    -------
+    str
+        Path to the discovered streamflow file
+
+    """
+    files = glob.glob(f"{data_dir}/**/{basin}_streamflow_qc.txt", recursive=True)
+    if len(files) == 0:
+        raise FileNotFoundError(f"Can't find file for basin {basin} within directory {data_dir}.")
+    if len(files) > 1:
+        logger.warning(f"Found multiple files for basin {basin} within directory {data_dir}. "
+                       f"First one found will be returned.")
+    return files[0]
+
+
+def discover_multiple_camels_us_forcings_files(data_dir: str, forcings_type: str, basins: list = None):
+    """
+    Discovers multiple CAMELS-US forcing files. All files will be considered that follow the pattern
+    '{data_dir}/**/*_lump_{forcings_type}_forcing_leap.txt'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the CAMELS-US data directory for forcings.
+    forcings_type: str
+        Type of the forcing timeseries, i.e. one of 'daymet', 'maurer', or 'nldas'
+    basins: list
+        List of basins, the forcings files will be discovered for. If 'None', all present files will be considered
+
+    Returns
+    -------
+    list
+        List of forcing file paths for the specified basins.
+
+    """
+    type_dict = {"daymet": "cida", "maurer": "maurer", "nldas": "nldas"}
+    if forcings_type in type_dict:
+        files = glob.glob(f"{data_dir}/**/*_lump_{type_dict[forcings_type]}_forcing_leap.txt", recursive=True)
+        if basins is not None:
+            files = [f for f in files if (any(basin == os.path.basename(f)[0:8] for basin in basins))]
+    else:
+        raise ValueError(f"Invalid forcings type `{forcings_type}` specified.")
+    return files
+
+
+def discover_multiple_camels_us_streamflow_files(data_dir: str, basins: list = None):
+    """
+    Discovers multiple CAMELS-US streamflow files. All files will be considered that follow the pattern
+    '{data_dir}/**/*_streamflow_qc.txt'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the CAMELS-US data directory for streamflow
+    basins: list
+        List of basins, the streamflow files will be discovered for. If 'None', all present files will be considered.
+
+    Returns
+    -------
+    list
+        List of streamflow file paths for the specified basins.
+
+    """
+    files = glob.glob(f"{data_dir}/**/*_streamflow_qc.txt")
+    if basins is not None:
+        files = [f for f in files if (any(basin == os.path.basename(f)[0:8] for basin in basins))]
+    return files
+
+
 def load_forcings(path: str, ds_type: str):
     """
     Load a dataset that contains forcing data
@@ -167,7 +279,7 @@ def load_streamflow_camels_us(path: str) -> pd.DataFrame:
 
     """
     df = pd.read_csv(path, delim_whitespace=True, header=None, decimal='.', na_values=["-999.00"],
-                     names=["gauge_id", "year", "month", "day", "streamflow", "qc_flag"])
+                     names=["gauge_id", "year", "month", "day", "streamflow", "qc_flag"], dtype={"gauge_id": str})
     df["date"] = pd.to_datetime(df[["year", "month", "day"]])
     df = df.drop(columns=["year", "month", "day"]).set_index("date")
 
