@@ -2,6 +2,7 @@ from libs import dataset
 import unittest
 import pandas as pd
 import numpy as np
+import xarray as xr
 
 
 def create_streamflow_data():
@@ -23,48 +24,37 @@ def create_forcings_data():
     return df
 
 
-class TestDataset(unittest.TestCase):
-
+class LumpedDataset(unittest.TestCase):
     def setUp(self):
-        self.__streamflow_data = create_streamflow_data()
-        self.__forcings_data = create_forcings_data()
+        df_forcings = create_forcings_data()
+        df_streamflow = create_streamflow_data()
 
-    def test_factory(self):
-        data = dataset.factory(self.__forcings_data, self.__streamflow_data, "camels-us", ["temp"],  ["streamflow"])
+        df_merged = df_forcings.join(df_streamflow, how="outer")
 
-        self.assertIsInstance(data, dataset.CamelUSDataset)
-        self.assertEqual(list(data.forcings), ["temp"])
-        self.assertEqual(list(data.streamflow), ["streamflow"])
-        self.assertEqual(len(data.forcings), 20)
-        self.assertEqual(len(data.streamflow), 20)
-        self.assertRaises(ValueError, dataset.factory,  self.__forcings_data, self.__streamflow_data, "non-valid-type",
-                          ["temp"], ["streamflow"])
+        ds_timeseries = xr.Dataset.from_dataframe(df_merged)
+        ds_timeseries = ds_timeseries.rename({"index": "time"})
+        ds_timeseries = ds_timeseries.assign_coords({"basin": "123"})
 
-        data = dataset.factory(self.__forcings_data, self.__streamflow_data, "camels-us", ["temp"], ["streamflow"],
-                               "2021-01-03", "2021-01-06")
-        self.assertEqual(len(data.forcings), 4)
-        self.assertEqual(len(data.streamflow), 4)
+        self.__dataset = dataset.LumpedDataset(ds_timeseries, ["temp", "prcp"], ["streamflow"],
+                                               "2021-01-01", "2021-01-20")
 
+    def test_normalize_single(self):
+        min_prcp_index = self.__dataset.timeseries.prcp.argmin(dim=["time"])
+        max_prcp_index = self.__dataset.timeseries.prcp.argmax(dim=["time"])
+        min_streamflow_index = self.__dataset.timeseries.streamflow.argmin(dim=["time"])
+        max_streamflow_index = self.__dataset.timeseries.streamflow.argmax(dim=["time"])
 
-class TestTimeseriesDataset(unittest.TestCase):
-    def setUp(self):
-        self.__streamflow_data = create_streamflow_data()
-        self.__forcings_data = create_forcings_data()
+        self.__dataset.normalize()
 
-    def test_normalize(self):
-        data = dataset.TimeseriesDataset(self.__forcings_data.to_numpy(), self.__streamflow_data.to_numpy())
-        min_input_indices = np.argmin(data.forcings_timeseries, axis=0)
-        max_input_indices = np.argmax(data.forcings_timeseries, axis=0)
-        min_target_indices = np.nanargmin(data.streamflow_timeseres, axis=0)
-        max_target_indices = np.nanargmax(data.streamflow_timeseres, axis=0)
-        data.normalize()
+        self.assertEqual(self.__dataset.timeseries.prcp.min().values, 0)
+        self.assertEqual(self.__dataset.timeseries.temp.min().values, 0)
+        self.assertEqual(self.__dataset.timeseries.streamflow.min().values, 0)
+        self.assertEqual(self.__dataset.timeseries.prcp.max().values, 1)
+        self.assertEqual(self.__dataset.timeseries.temp.max().values, 1)
+        self.assertEqual(self.__dataset.timeseries.streamflow.max().values, 1)
 
-        np.testing.assert_array_equal(np.min(data.forcings_timeseries, axis=0), np.array([0, 0]))
-        np.testing.assert_array_equal(np.max(data.forcings_timeseries, axis=0), np.array([1, 1]))
-        self.assertEqual(data.forcings_timeseries[min_input_indices[0], 0], 0)
-        self.assertEqual(data.forcings_timeseries[min_input_indices[1], 1], 0)
-        self.assertEqual(data.forcings_timeseries[max_input_indices[0], 0], 1)
-        self.assertEqual(data.forcings_timeseries[max_input_indices[1], 1], 1)
+        self.assertEqual(self.__dataset.timeseries.streamflow.isel(min_streamflow_index), 0)
+        self.assertEqual(self.__dataset.timeseries.streamflow.isel(max_streamflow_index), 1)
+        self.assertEqual(self.__dataset.timeseries.prcp.isel(min_prcp_index), 0)
+        self.assertEqual(self.__dataset.timeseries.prcp.isel(max_prcp_index), 1)
 
-        self.assertEqual(data.streamflow_timeseres[min_target_indices[0], 0], 0)
-        self.assertEqual(data.streamflow_timeseres[max_target_indices[0], 0], 1)
