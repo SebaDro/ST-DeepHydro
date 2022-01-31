@@ -1,9 +1,11 @@
 from libs import dataset
-import pandas as pd
-import numpy as np
+import logging
 
 
-class AbstractProcessingPipeline:
+logger = logging.getLogger(__name__)
+
+
+class AbstractProcessor:
     def __init__(self, scaling_params: tuple = None):
         self.__scaling_params = scaling_params
 
@@ -18,75 +20,70 @@ class AbstractProcessingPipeline:
     def fit(self, ds: dataset.AbstractDataset):
         pass
 
-    def process_and_fit(self, ds: dataset.AbstractDataset) -> dataset.TimeseriesDataset:
+    def process_and_fit(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
         pass
 
-    def process(self, ds: dataset.AbstractDataset) -> dataset.TimeseriesDataset:
+    def process(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
         pass
 
 
-class CamelsUsProcessingPipeline(AbstractProcessingPipeline):
+class LumpedDatasetProcessor(AbstractProcessor):
+    def __init__(self, scaling_params: tuple = None):
+        """
+        Initializes a LumpedDatasetProcessor instance that peforms several default processing steps on timeseries data
+        wrapped by a dataset.LumpedDataset.
 
-    def fit(self, ds: dataset.CamelUSDataset):
-        inputs, targets = align_datasets(ds.forcings, ds.streamflow)
-        self.__fit_scaling_params(inputs, targets)
+        Parameters
+        ----------
+        scaling_params: tuple
+            Parameters that should be used for performing min-max-sacling on the timeseries data.
+        """
+        super().__init__(scaling_params)
 
-    def process_and_fit(self, ds: dataset.CamelUSDataset):
-        inputs, targets = align_datasets(ds.forcings, ds.streamflow)
-        timeseries_data = dataset.TimeseriesDataset(inputs.to_numpy(), targets.to_numpy())
-        timeseries_data.normalize()
-        self.scaling_params = (timeseries_data.min_features, timeseries_data.max_features,
-                               timeseries_data.min_features, timeseries_data.max_targets)
+    def fit(self, ds: dataset.LumpedDataset):
+        """
+        Fits the processor to a dataset which usually should be the training dataset. Fitting means, the processor will
+        derive various parameters from the specified dataset which will be used for several subsequent processing steps.
+        Usually, you will fit the processor on the training data to use the derived parameters for processing the
+        validation and test datasets.
 
-        return timeseries_data
+        Up to now, this method will derive the following parameters:
+        - Minimum and maximum values for each variable, which will be used for performing a min-max-scalin.
 
-    def process(self, ds: dataset.CamelUSDataset):
-        inputs, targets = align_datasets(ds.forcings, ds.streamflow)
-        timeseries_data = dataset.TimeseriesDataset(inputs.to_numpy(), targets.to_numpy())
-        timeseries_data.normalize(*self.scaling_params)
+        Parameters
+        ----------
+        ds: dataset.LumpedDataset
+            Dataset that holds timeseries data as xarray.Dataset
 
-        return timeseries_data
+        """
+        self.__fit_scaling_params(ds)
 
-    def __select_data(self):
-        inputs = self.forcings[self.feature_cols]
-        targets = self.streamflow[self.target_cols]
-        return inputs, targets
+    def process(self, ds: dataset.LumpedDataset):
+        """
+        Performs several processing steps on a dataset.LumpedDataset.
 
-    def __fit_scaling_params(self, inputs, targets):
-        inputs, targets = align_datasets(inputs, targets)
-        axes = tuple(range(len(inputs.shape) - 1))
-        inputs = inputs.to_numpy()
-        targets = targets.to_numpy()
-        min_features = np.nanmin(inputs, axis=axes)
-        max_features = np.nanmax(inputs, axis=axes)
-        min_targets = np.nanmin(targets, axis=0)
-        max_targets = np.nanmax(targets, axis=0)
-        self.scaling_params = (min_features, max_features, min_targets, max_targets)
+        Note, that it will use parameters that have been
+        derived while fitting the processor to a dataset using the fit function. If this function have not been called
+        before, it will automatically derive the same parameters form the specified dataset. This will lead to
+        misleading results if you aim to process validation and test datsets by using processing parameters derived from
+        a training dataset. Hence, it is strongly recommended to first call fit() on a dedicated dataset-
 
+        Parameters
+        ----------
+        ds: dataset.LumpedDataset
+            Dataset that will be processed
 
-def align_datasets(df1: pd.DataFrame, df2: pd.DataFrame):
-    """
-    Ensures that two time indexed datasets cover the same timespan
+        Returns
+        -------
+            The resulting dataset.LumpedDataset after performing various processing steps on it
 
-    Parameters
-    ----------
-    df1
-        First pandas.DataFrame
-    df2
-        Second pandas.DataFrame
+        """
+        if self.scaling_params is None:
+            logging.warning("Processor has not been fit to a dataset before. Thus, it will be fitted to the provided "
+                            "dataset.")
+            self.__fit_scaling_params(ds)
+        ds.normalize(*self.scaling_params)
+        return ds
 
-    Returns
-    -------
-    Two pandas.Dataframes that cover the same timespan
-
-    """
-    common_start_date = max(df1.index.min(), df2.index.min())
-    common_end_date = min(df1.index.max(), df2.index.max())
-
-    return df1[common_start_date:common_end_date], df2[common_start_date:common_end_date]
-
-
-def factory(ds: dataset.AbstractDataset) -> AbstractProcessingPipeline:
-    if isinstance(ds, dataset.CamelUSDataset):
-        return CamelsUsProcessingPipeline(ds)
-    raise ValueError("Dataset type '{}' is not supported.".format(type(ds)))
+    def __fit_scaling_params(self, ds: dataset.LumpedDataset):
+        self.scaling_params = (ds.timeseries.min(), ds.timeseries.max())
