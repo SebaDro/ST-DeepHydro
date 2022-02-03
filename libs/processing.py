@@ -1,5 +1,12 @@
-from libs import dataset
+import datetime
 import logging
+import math
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+import xarray as xr
+
+from libs import dataset
 
 
 logger = logging.getLogger(__name__)
@@ -87,3 +94,53 @@ class LumpedDatasetProcessor(AbstractProcessor):
 
     def __fit_scaling_params(self, ds: dataset.LumpedDataset):
         self.scaling_params = (ds.timeseries.min(), ds.timeseries.max())
+
+
+class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
+
+    def __init__(self, timeseries: xr.Dataset, batch_size, timesteps, offset, feature_cols, target_cols, drop_na=False):
+        self.timeseries = timeseries
+        self.batch_size = batch_size
+        self.timesteps = timesteps
+        self.offset = offset
+        self.drop_na = drop_na
+        self.feature_cols = feature_cols
+        self.target_cols = target_cols
+        self.idx_dict = self.__get_idx_df(drop_na)
+
+    def __get_idx_df(self, drop_na):
+        lag = self.timesteps + self.offset - 1
+
+        date_list = []
+        basin_list = []
+        dates = self.timeseries.time[lag:].values
+        basins = self.timeseries.basin.values
+        for basin in basins:
+            if drop_na:
+                # Only consider streamflow values which are not NaN
+                non_nan_flags = np.invert(np.isnan(self.timeseries.sel(basin=basin).streamflow))
+                sel_dates = dates[non_nan_flags[lag:].values]
+            else:
+                sel_dates = dates
+            basin_list.extend([basin] * len(sel_dates))
+            date_list.extend(sel_dates)
+        return pd.DataFrame({"basin": basin_list, "time": date_list})
+
+    def __len__(self):
+        n_samples = len(self.idx_dict)
+        return math.ceil(n_samples / self.batch_size)
+
+    def __getitem__(self, idx):
+        df_batch = self.idx_dict[idx * self.batch_size:(idx + 1) * self.batch_size]
+
+        inputs = np.empty((0, self.timesteps, len(self.feature_cols)))
+        targets = np.empty((0, len(self.target_cols)))
+        for index, row in df_batch.iterrows():
+            start_date = row.time - datetime.timedelta(days=self.timesteps)
+            end_date = row.time - datetime.timedelta(days=self.offset)
+            forcings_values = self.timeseries.sel(basin=row.basin,
+                                                  time=slice(start_date, end_date))[self.feature_cols].to_array().values
+            streamflow_values = self.timeseries.sel(basin=row.basin, time=row.time)[self.target_cols].to_array().values
+            inputs = np.vstack([inputs, np.expand_dims(forcings_values.transpose(), axis=0)])
+            targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
+        return inputs, targets
