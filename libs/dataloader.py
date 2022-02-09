@@ -124,7 +124,7 @@ class CamelsUSDataLoader(AbstractDataLoader):
         ds_timeseries = self.load_xarray_dataset(basin)
 
         return dataset.LumpedDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
-                             self.start_date, self.end_date)
+                                     self.start_date, self.end_date)
 
     def load_full_dataset(self, as_dask: bool = False) -> dataset.LumpedDataset:
         """
@@ -177,6 +177,9 @@ class CamelsUSDataLoader(AbstractDataLoader):
         df_forcings = df_forcings[self.start_date:self.end_date][self.forcings_variables].reindex(date_range)
         df_streamflow = df_streamflow[self.start_date:self.end_date][self.streamflow_variables].reindex(date_range)
 
+        latitude, elevation, area = ioutils.load_forcings_gauge_metadata(self.forcings_dir)
+        df_streamflow[self.streamflow_variables] = convert_streamflow(df_streamflow[self.streamflow_variables], area)
+
         df_merged = df_forcings.join(df_streamflow, how="outer")
 
         ds_timeseries = xr.Dataset.from_dataframe(df_merged)
@@ -186,8 +189,16 @@ class CamelsUSDataLoader(AbstractDataLoader):
         return ds_timeseries
 
 
+def convert_streamflow(streamflow, area: float):
+    streamflow = streamflow * 0.028316846592  # [m³/s]
+    streamflow = streamflow / area  # [m/s]
+    streamflow = streamflow * 86400  # [m/d]
+    return streamflow * 10 ** 3  # [mm/d]
+
+
 def factory(data_cfg: config.DataConfig, dataset_cfg: config.DatasetConfig) -> AbstractDataLoader:
     if data_cfg.forcings_cfg.data_type == "camels-us" and data_cfg.streamflow_cfg.data_type == "camels-us":
         return CamelsUSDataLoader.from_config(data_cfg, dataset_cfg)
     raise ValueError("No data loader exists for the specified dataset types Dataset types '{}' and '{}'."
                      .format(data_cfg.forcings_cfg.data_type, data_cfg.streamflow_cfg.data_type))
+

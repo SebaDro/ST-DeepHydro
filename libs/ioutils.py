@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import pandas as pd
 import xarray as xr
 import glob
@@ -222,6 +224,28 @@ def load_forcings_camels_us(path: str) -> pd.DataFrame:
                                 .rename(columns={0: "year", 1: "month", 2: "day"}))
     df = df.set_index("date")
     return df
+
+
+def load_forcings_gauge_metadata(path: str) -> Tuple[float, float, float]:
+    """
+    Loads gauge metadata from the header of a CAMELS-USE forcings file.
+
+    Parameters
+    ----------
+    path: str
+        Path to the forcings file.
+
+    Returns
+    -------
+    tuple
+        (gauge latitude, gauge elevation, basin area [m²])
+
+    """
+    with open(path, 'r') as file:
+        latitude = float(file.readline())
+        elevation = float(file.readline())
+        area = float(file.readline())
+    return latitude, elevation, area
 
 
 def load_forcings_daymet_2d(path: str) -> xr.Dataset:
