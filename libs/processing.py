@@ -98,14 +98,16 @@ class LumpedDatasetProcessor(AbstractProcessor):
 
 class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
-    def __init__(self, timeseries: xr.Dataset, batch_size, timesteps, offset, feature_cols, target_cols, drop_na=False):
+    def __init__(self, timeseries: xr.Dataset, batch_size, timesteps, offset, feature_cols, target_cols, drop_na=False,
+                 input_shape: tuple=None):
         self.timeseries = timeseries
         self.batch_size = batch_size
         self.timesteps = timesteps
         self.offset = offset
-        self.drop_na = drop_na
         self.feature_cols = feature_cols
         self.target_cols = target_cols
+        self.drop_na = drop_na
+        self.input_shape = input_shape
         self.idx_dict = self.__get_idx_df(drop_na)
 
     def __get_idx_df(self, drop_na):
@@ -133,7 +135,10 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
     def __getitem__(self, idx):
         df_batch = self.idx_dict[idx * self.batch_size:(idx + 1) * self.batch_size]
 
-        inputs = np.empty((0, self.timesteps, len(self.feature_cols)))
+        if self.input_shape:
+            inputs = np.empty((0,) + self.input_shape)
+        else:
+            inputs = np.empty((0, self.timesteps, len(self.feature_cols)))
         targets = np.empty((0, len(self.target_cols)))
         for index, row in df_batch.iterrows():
             start_date = row.time - datetime.timedelta(days=self.timesteps)
@@ -141,6 +146,7 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
             forcings_values = self.timeseries.sel(basin=row.basin,
                                                   time=slice(start_date, end_date))[self.feature_cols].to_array().values
             streamflow_values = self.timeseries.sel(basin=row.basin, time=row.time)[self.target_cols].to_array().values
-            inputs = np.vstack([inputs, np.expand_dims(forcings_values.transpose(), axis=0)])
+            forcings_values = np.moveaxis(forcings_values, 0, -1)
+            inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
             targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
         return inputs, targets
