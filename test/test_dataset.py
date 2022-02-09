@@ -24,7 +24,7 @@ def create_forcings_data():
     return df
 
 
-class LumpedDataset(unittest.TestCase):
+class TestLumpedDataset(unittest.TestCase):
     def setUp(self):
         df_forcings = create_forcings_data()
         df_streamflow = create_streamflow_data()
