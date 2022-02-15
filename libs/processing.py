@@ -98,8 +98,28 @@ class LumpedDatasetProcessor(AbstractProcessor):
 
 class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
-    def __init__(self, timeseries: xr.Dataset, batch_size, timesteps, offset, feature_cols, target_cols, drop_na=False,
-                 input_shape: tuple=None):
+    def __init__(self, timeseries: xr.Dataset, batch_size: int, timesteps: int, offset: int, feature_cols: list,
+                 target_cols: list, drop_na: bool = False, input_shape: tuple = None):
+        """
+        A custom TimeseriesGenerator that creates batches of timeseries from a xarray.Dataset and optionally takes
+        also into account NaN values.
+
+        Parameters
+        ----------
+        timeseries: xarray.Dataset
+            Dataset that holds forcings and streamflow timeseries data
+        batch_size: int
+            Size of the batches that will be created
+        timesteps: int
+            How many timesteps will be used for creating the input (forcings) timeseries
+        offset: int
+            Offset between inputs (forcings) and target (streamflow). An offset of 1 means that forcings for the last
+            n-days will be taken as input and the the streamflow for n + 1 will be taken as target.
+        feature_cols
+        target_cols
+        drop_na
+        input_shape
+        """
         self.timeseries = timeseries
         self.batch_size = batch_size
         self.timesteps = timesteps
@@ -138,7 +158,8 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
         if self.input_shape:
             inputs = np.empty((0,) + self.input_shape)
         else:
-            inputs = np.empty((0, self.timesteps, len(self.feature_cols)))
+            shape = self.__get_input_shape()
+            inputs = np.empty(shape)
         targets = np.empty((0, len(self.target_cols)))
         for index, row in df_batch.iterrows():
             start_date = row.time - datetime.timedelta(days=self.timesteps)
@@ -150,3 +171,11 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
             inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
             targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
         return inputs, targets
+
+    def _get_input_shape(self):
+        # Determine all additional dimensions beside 'variable', 'basin' and 'time' and use its size for
+        # defining the input shape
+        dim_indices = [dim for dim in self.timeseries[self.feature_cols].to_array().dims if
+                       dim not in ["variable", "basin", "time"]]
+        dim_size = tuple(self.timeseries[dim].size for dim in dim_indices)
+        return (0, self.timesteps) + dim_size + (len(self.feature_cols),)

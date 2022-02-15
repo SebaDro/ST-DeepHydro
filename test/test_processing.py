@@ -74,6 +74,30 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         self.ds_timeseries = create_one_dimensional_dataset()
         self.ds_timeseries_2d = create_two_dimensional_dataset()
 
+    def test_get_input_shape_1d(self):
+        batch_size = 6
+        timesteps = 8
+        offset = 1
+        feature_cols = ["temp", "prcp"]
+        target_cols = ["streamflow"]
+
+        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries, batch_size, timesteps, offset, feature_cols,
+                                                   target_cols, False)
+        exp_shape = (0, 8, 2)
+        self.assertEqual(exp_shape, gen._get_input_shape())
+
+    def test_get_input_shape_2d(self):
+        batch_size = 6
+        timesteps = 6
+        offset = 1
+        feature_cols = ["temp", "prcp"]
+        target_cols = ["streamflow"]
+
+        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries_2d, batch_size, timesteps, offset, feature_cols,
+                                                   target_cols, False)
+        exp_shape = (0, 6, 12, 14, 2)
+        self.assertEqual(exp_shape, gen._get_input_shape())
+
     def test_timeseries_generation(self):
         batch_size = 6
         timesteps = 4
