@@ -15,7 +15,7 @@ def discover_single_file_for_basin(data_dir: str, basin: str) -> str:
     """
     Discovers a single dataset file for the specified basin. Discovery will be performed using the pattern
     '{data_dir}/*{basin}*', i.e. the basin ID has to be present in any file name within the directory. Note, that
-    basin id '123' e.g. will match the following file names: 123_streamflow.txt, 123.nc, 00123456.nc4,
+    basin id '123' e.g. will match the following file names: 123_streamflow.txt, 123.nc, 00123456_daymet_v4_daily_na.nc4,
     streamflow_123.csv. Be sure, that your file names are unique, otherwise only the first occurence will be returned.
 
     Parameters
