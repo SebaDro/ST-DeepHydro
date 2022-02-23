@@ -13,8 +13,23 @@ class AbstractDataset:
     def timeseries(self, value):
         self.__timeseries = value
 
-    def normalize(self, min_params: xr.Dataset, max_params: xr.Dataset):
-        pass
+    def normalize(self, min_params: xr.Dataset = None, max_params: xr.Dataset = None):
+        """
+        Performs a min/max scaling on all variables that are present within a xarray.Dataset.
+
+        Parameters
+        ----------
+        min_params: xarray.Dataset
+            Minimum parameters as reduced xarray.Dataset that will be used for scaling. If None, this parameter will be
+            calculated from the current dataset.
+        max_params: xarray.Dataset
+            Maximum parameters as reduced xarray.Dataset that will be used for scaling. If None, this parameter will be
+            calculated from the current dataset.
+        """
+        min_params = self.timeseries.min() if min_params is None else min_params
+        max_params = self.timeseries.max() if max_params is None else max_params
+
+        self.timeseries = (self.timeseries - min_params) / (max_params - min_params)
 
 
 class LumpedDataset(AbstractDataset):
@@ -45,24 +60,6 @@ class LumpedDataset(AbstractDataset):
         self.__start_date = start_date
         self.__end_date = end_date
         super().__init__(timeseries)
-
-    def normalize(self, min_params: xr.Dataset = None, max_params: xr.Dataset = None):
-        """
-        Performs a min/max scaling on all variables that are present within a xarray.Dataset.
-
-        Parameters
-        ----------
-        min_params: xarray.Dataset
-            Minimum parameters as reduced xarray.Dataset that will be used for scaling. If None, this parameter will be
-            calculated from the current dataset.
-        max_params: xarray.Dataset
-            Maximum parameters as reduced xarray.Dataset that will be used for scaling. If None, this parameter will be
-            calculated from the current dataset.
-        """
-        min_params = self.timeseries.min() if min_params is None else min_params
-        max_params = self.timeseries.max() if max_params is None else max_params
-
-        self.timeseries = (self.timeseries - min_params) / (max_params - min_params)
 
 
 class DistributedDataset(AbstractDataset):

@@ -34,11 +34,11 @@ class AbstractProcessor:
         pass
 
 
-class LumpedDatasetProcessor(AbstractProcessor):
+class DefaultDatasetProcessor(AbstractProcessor):
     def __init__(self, scaling_params: tuple = None):
         """
-        Initializes a LumpedDatasetProcessor instance that peforms several default processing steps on timeseries data
-        wrapped by a dataset.LumpedDataset.
+        Initializes a DefaultDatasetProcessor instance that peforms several default processing steps on timeseries data
+        wrapped by a dataset.AbstractDataset instance.
 
         Parameters
         ----------
@@ -47,7 +47,7 @@ class LumpedDatasetProcessor(AbstractProcessor):
         """
         super().__init__(scaling_params)
 
-    def fit(self, ds: dataset.LumpedDataset):
+    def fit(self, ds: dataset.AbstractDataset):
         """
         Fits the processor to a dataset which usually should be the training dataset. Fitting means, the processor will
         derive various parameters from the specified dataset which will be used for several subsequent processing steps.
@@ -65,7 +65,7 @@ class LumpedDatasetProcessor(AbstractProcessor):
         """
         self.__fit_scaling_params(ds)
 
-    def process(self, ds: dataset.LumpedDataset):
+    def process(self, ds: dataset.AbstractDataset):
         """
         Performs several processing steps on a dataset.LumpedDataset.
 
@@ -92,7 +92,7 @@ class LumpedDatasetProcessor(AbstractProcessor):
         ds.normalize(*self.scaling_params)
         return ds
 
-    def __fit_scaling_params(self, ds: dataset.LumpedDataset):
+    def __fit_scaling_params(self, ds: dataset.AbstractDataset):
         self.scaling_params = (ds.timeseries.min(), ds.timeseries.max())
 
 
