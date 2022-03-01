@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import xarray as xr
+import time
 
 from libs import dataset
 
@@ -59,7 +60,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         Parameters
         ----------
-        ds: dataset.LumpedDataset
+        ds: dataset.AbstractDataset
             Dataset that holds timeseries data as xarray.Dataset
 
         """
@@ -77,7 +78,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         Parameters
         ----------
-        ds: dataset.LumpedDataset
+        ds: dataset.AbstractDataset
             Dataset that will be processed
 
         Returns
@@ -98,7 +99,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
 class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
-    def __init__(self, timeseries: xr.Dataset, batch_size: int, timesteps: int, offset: int, feature_cols: list,
+    def __init__(self, ds: dataset.AbstractDataset, batch_size: int, timesteps: int, offset: int, feature_cols: list,
                  target_cols: list, drop_na: bool = False, input_shape: tuple = None):
         """
         A custom TimeseriesGenerator that creates batches of timeseries from a xarray.Dataset and optionally takes
@@ -106,7 +107,7 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
         Parameters
         ----------
-        timeseries: xarray.Dataset
+        ds: dataset.Dataset
             Dataset that holds forcings and streamflow timeseries data
         batch_size: int
             Size of the batches that will be created
@@ -120,7 +121,7 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
         drop_na
         input_shape
         """
-        self.timeseries = timeseries
+        self.ds = ds
         self.batch_size = batch_size
         self.timesteps = timesteps
         self.offset = offset
@@ -129,24 +130,26 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
         self.drop_na = drop_na
         self.input_shape = input_shape
         self.idx_dict = self.__get_idx_df(drop_na)
+        self.ds_inputs = ds.timeseries[feature_cols].to_array()
+        self.ds_targets = ds.timeseries[target_cols].to_array()
 
     def __get_idx_df(self, drop_na):
         lag = self.timesteps + self.offset - 1
 
-        date_list = []
-        basin_list = []
-        dates = self.timeseries.time[lag:].values
-        basins = self.timeseries.basin.values
-        for basin in basins:
+        date_idx_list = []
+        basin_idx_list = []
+        basins = self.ds.timeseries.basin.values
+        for i, basin in enumerate(basins):
             if drop_na:
                 # Only consider streamflow values which are not NaN
-                non_nan_flags = np.invert(np.isnan(self.timeseries.sel(basin=basin).streamflow))
-                sel_dates = dates[non_nan_flags[lag:].values]
+                non_nan_flags = np.invert(np.isnan(self.ds.timeseries.sel(basin=basin).streamflow))
+                # sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[non_nan_flags[lag:]]
+                sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[lag:][non_nan_flags.values[lag:]]
             else:
-                sel_dates = dates
-            basin_list.extend([basin] * len(sel_dates))
-            date_list.extend(sel_dates)
-        return pd.DataFrame({"basin": basin_list, "time": date_list})
+                sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[lag:]
+            basin_idx_list.extend([i] * len(sel_indices))
+            date_idx_list.extend(sel_indices)
+        return pd.DataFrame({"basin_idx": basin_idx_list, "time_idx": date_idx_list})
 
     def __len__(self):
         n_samples = len(self.idx_dict)
@@ -158,24 +161,20 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
         if self.input_shape:
             inputs = np.empty((0,) + self.input_shape)
         else:
-            shape = self.__get_input_shape()
+            shape = self._get_input_shape()
             inputs = np.empty(shape)
         targets = np.empty((0, len(self.target_cols)))
+
         for index, row in df_batch.iterrows():
-            start_date = row.time - datetime.timedelta(days=self.timesteps)
-            end_date = row.time - datetime.timedelta(days=self.offset)
-            forcings_values = self.timeseries.sel(basin=row.basin,
-                                                  time=slice(start_date, end_date))[self.feature_cols].to_array().values
-            streamflow_values = self.timeseries.sel(basin=row.basin, time=row.time)[self.target_cols].to_array().values
+            start_date_idx = row.time_idx - self.timesteps
+            end_date_idx = row.time_idx - self.offset + 1
+            forcings_values = self.ds_inputs[:, row.basin_idx, start_date_idx:end_date_idx].values
+            streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
             forcings_values = np.moveaxis(forcings_values, 0, -1)
             inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
             targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
+
         return inputs, targets
 
     def _get_input_shape(self):
-        # Determine all additional dimensions beside 'variable', 'basin' and 'time' and use its size for
-        # defining the input shape
-        dim_indices = [dim for dim in self.timeseries[self.feature_cols].to_array().dims if
-                       dim not in ["variable", "basin", "time"]]
-        dim_size = tuple(self.timeseries[dim].size for dim in dim_indices)
-        return (0, self.timesteps) + dim_size + (len(self.feature_cols),)
+        return (0, self.timesteps) + self.ds.get_input_shape()

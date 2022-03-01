@@ -5,6 +5,7 @@ import unittest
 import xarray as xr
 
 from libs import processing
+from libs import dataset
 
 
 def create_streamflow_data():
@@ -45,7 +46,8 @@ def create_one_dimensional_dataset():
     ds_timeseries_2 = ds_timeseries_2.rename({"index": "time"})
     ds_timeseries_2 = ds_timeseries_2.assign_coords({"basin": basin_2})
 
-    return xr.concat([ds_timeseries_1, ds_timeseries_2], dim="basin")
+    return dataset.LumpedDataset(xr.concat([ds_timeseries_1, ds_timeseries_2], dim="basin"),
+                                 feature_variables=["temp", "prcp"], target_variables=["streamflow"])
 
 
 def create_two_dimensional_dataset():
@@ -64,15 +66,16 @@ def create_two_dimensional_dataset():
     prcp_xr = xr.DataArray(prcp_data, coords=[basins, dates, y, x], dims=["basin", "time", "y", "x"])
     streamflow_xr = xr.DataArray(streamflow_data, coords=[basins, dates], dims=["basin", "time"])
 
-    return xr.Dataset(dict(temp=temp_xr, prcp=prcp_xr, streamflow=streamflow_xr))
+    return dataset.LumpedDataset(xr.Dataset(dict(temp=temp_xr, prcp=prcp_xr, streamflow=streamflow_xr)),
+                                 feature_variables=["temp", "prcp"], target_variables=["streamflow"])
 
 
 class TestCustomTimeseriesGenerator(unittest.TestCase):
     def setUp(self):
         self.basin_1 = "123"
         self.basin_2 = "456"
-        self.ds_timeseries = create_one_dimensional_dataset()
-        self.ds_timeseries_2d = create_two_dimensional_dataset()
+        self.ds = create_one_dimensional_dataset()
+        self.ds_2d = create_two_dimensional_dataset()
 
     def test_get_input_shape_1d(self):
         batch_size = 6
@@ -81,7 +84,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_cols = ["streamflow"]
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
         exp_shape = (0, 8, 2)
         self.assertEqual(exp_shape, gen._get_input_shape())
@@ -93,7 +96,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_cols = ["streamflow"]
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries_2d, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
         exp_shape = (0, 6, 12, 14, 2)
         self.assertEqual(exp_shape, gen._get_input_shape())
@@ -107,7 +110,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         lag = timesteps + offset - 1
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
 
         # First, check the number of batches
@@ -119,8 +122,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # First batch
         batch = 0
         inputs, targets = gen[batch]
-        x1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[0:timesteps, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[timesteps, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[0:timesteps, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[timesteps, 2]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
@@ -130,15 +133,15 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 2
         inputs, targets = gen[batch]
         # Last batch of basin 1
-        x1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-(timesteps+offset):-1, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-1, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-(timesteps + offset):-1, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-1, 2]
         x2 = inputs[3]
         y2 = targets[3]
         np.testing.assert_array_equal(x1, x2)
         np.testing.assert_array_equal(y1, y2)
         # First batch of basin 2
-        x1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[0:timesteps, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[timesteps, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[0:timesteps, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[timesteps, 2]
         x2 = inputs[4]
         y2 = targets[4]
         np.testing.assert_array_equal(x1, x2)
@@ -148,8 +151,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 5
         inputs, targets = gen[batch]
 
-        x1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-(timesteps+offset):-1, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-1, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-(timesteps + offset):-1, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-1, 2]
         x2 = inputs[1]
         y2 = targets[1]
         # Last batch should contain only 2 elements
@@ -168,7 +171,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the first two batches contains only inputs and targets for basin 1 and the other two batches
         # for basin 2
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, True)
 
         # First, check the number of batches
@@ -181,8 +184,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # First batch
         batch = 0
         inputs, targets = gen[batch]
-        x1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[0:timesteps, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[timesteps, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[0:timesteps, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[timesteps, 2]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
@@ -192,8 +195,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 1
         inputs, targets = gen[batch]
         # Last batch of basin 1.
-        x1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-(timesteps+offset):-1, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-1, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-(timesteps + offset):-1, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_1).to_array().values.transpose()[-1, 2]
         x2 = inputs[5]
         y2 = targets[5]
         np.testing.assert_array_equal(x1, x2)
@@ -202,8 +205,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # First batch of basin 2
         batch = 2
         inputs, targets = gen[batch]
-        x1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[0:timesteps, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[timesteps, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[0:timesteps, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[timesteps, 2]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
@@ -213,8 +216,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 3
         inputs, targets = gen[batch]
 
-        x1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-(timesteps+offset):-1, 0:2]
-        y1 = self.ds_timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-1, 2]
+        x1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-(timesteps + offset):-1, 0:2]
+        y1 = self.ds.timeseries.sel(basin=self.basin_2).to_array().values.transpose()[-1, 2]
         x2 = inputs[5]
         y2 = targets[5]
         # Last batch should contain 6 elements
@@ -230,9 +233,9 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         target_cols = ["streamflow"]
 
         lag = timesteps + offset - 1
-        shape = (timesteps, len(self.ds_timeseries_2d.indexes["y"]), len(self.ds_timeseries_2d.indexes["x"]), len(feature_cols))
+        shape = (timesteps, len(self.ds_2d.timeseries.indexes["y"]), len(self.ds_2d.timeseries.indexes["x"]), len(feature_cols))
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries_2d, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False, shape)
 
         # First, check the number of batches
@@ -244,8 +247,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # First batch
         batch = 0
         inputs, targets = gen[batch]
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[batch*batch_size:batch*batch_size+timesteps]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[batch*batch_size+timesteps]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[batch * batch_size:batch * batch_size + timesteps]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[batch * batch_size + timesteps]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
@@ -255,8 +258,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 1
         i = 2
         inputs, targets = gen[batch]
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[i + batch*batch_size:i + batch*batch_size+timesteps]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[i + batch_size+timesteps]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[i + batch * batch_size:i + batch * batch_size + timesteps]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[i + batch_size + timesteps]
         x2 = inputs[i]
         y2 = targets[i]
         np.testing.assert_array_equal(x1, x2)
@@ -266,8 +269,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         batch = 2
         i = 3
         inputs, targets = gen[batch]
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[-(timesteps + offset):-1]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[-(timesteps + offset):-1]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
         x2 = inputs[i]
         y2 = targets[i]
         # Last batch should contain only 4 elements
@@ -284,11 +287,12 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         target_cols = ["streamflow"]
 
         lag = timesteps + offset - 1
-        shape = (timesteps, len(self.ds_timeseries_2d.indexes["y"]), len(self.ds_timeseries_2d.indexes["x"]), len(feature_cols))
+        shape = (timesteps, len(self.ds_2d.timeseries.indexes["y"]),
+                 len(self.ds_2d.timeseries.indexes["x"]), len(feature_cols))
 
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the number of batches is lower
-        gen = processing.CustomTimeseriesGenerator(self.ds_timeseries_2d, batch_size, timesteps, offset, feature_cols,
+        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, True, shape)
 
         # First, check the number of batches
@@ -301,8 +305,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # First batch
         batch = 0
         inputs, targets = gen[batch]
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[batch*batch_size:batch*batch_size+timesteps]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[batch*batch_size+timesteps]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[batch * batch_size:batch * batch_size + timesteps]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[batch * batch_size + timesteps]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
@@ -313,16 +317,16 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         inputs, targets = gen[batch]
         # Due to NaN values, now the target at index position 13 is first target value of the second batch
         i_target = 13
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[i_target-timesteps:i_target]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[i_target]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[i_target - timesteps:i_target]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[i_target]
         x2 = inputs[0]
         y2 = targets[0]
         np.testing.assert_array_equal(x1, x2)
         np.testing.assert_array_equal(y1, y2)
 
         # Check also last values of last batch
-        x1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[-(timesteps + offset):-1]
-        y1 = np.moveaxis(self.ds_timeseries_2d.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
+        x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[-(timesteps + offset):-1]
+        y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
         x2 = inputs[5]
         y2 = targets[5]
         # Last batch should contain 6 elements
