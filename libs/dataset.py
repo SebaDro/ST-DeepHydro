@@ -2,8 +2,13 @@ import xarray as xr
 
 
 class AbstractDataset:
-    def __init__(self, timeseries: xr.Dataset):
+    def __init__(self, timeseries: xr.Dataset, feature_variables: list, target_variables: list,
+                 start_date: str = None, end_date: str = None):
         self.__timeseries = timeseries
+        self.__feature_cols = feature_variables
+        self.__target_cols = target_variables
+        self.__start_date = start_date
+        self.__end_date = end_date
 
     @property
     def timeseries(self):
@@ -12,6 +17,38 @@ class AbstractDataset:
     @timeseries.setter
     def timeseries(self, value):
         self.__timeseries = value
+
+    @property
+    def feature_cols(self):
+        return self.__feature_cols
+
+    @property
+    def target_cols(self):
+        return self.__target_cols
+
+    @property
+    def start_date(self):
+        return self.__start_date
+
+    @property
+    def end_date(self):
+        return self.__end_date
+
+    def get_input_shape(self):
+        """
+        Determines the input shape considering all feature variables as well as additional dimensions. Only basind and
+        time dimension will be ignored which are both not relevant for the input shape.
+
+        Returns
+        -------
+        tuple:
+            Input shape
+
+        """
+        dim_indices = [dim for dim in self.timeseries[self.feature_cols].to_array().dims if
+                       dim not in ["variable", "basin", "time"]]
+        dim_size = tuple(self.timeseries[dim].size for dim in dim_indices)
+        return dim_size + (len(self.feature_cols),)
 
     def normalize(self, min_params: xr.Dataset = None, max_params: xr.Dataset = None):
         """
@@ -55,11 +92,7 @@ class LumpedDataset(AbstractDataset):
         end_date
             End date of the timeseries
         """
-        self.__feature_cols = feature_variables
-        self.__target_cols = target_variables
-        self.__start_date = start_date
-        self.__end_date = end_date
-        super().__init__(timeseries)
+        super().__init__(timeseries, feature_variables, target_variables, start_date, end_date)
 
 
 class DistributedDataset(AbstractDataset):
@@ -86,8 +119,4 @@ class DistributedDataset(AbstractDataset):
         end_date
             End date of the timeseries
         """
-        self.__feature_cols = feature_variables
-        self.__target_cols = target_variables
-        self.__start_date = start_date
-        self.__end_date = end_date
-        super().__init__(timeseries)
+        super().__init__(timeseries, feature_variables, target_variables, start_date, end_date)
