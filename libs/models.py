@@ -1,6 +1,7 @@
-
-import tensorflow as tf
+import numpy as np
 import os
+import tensorflow as tf
+import xarray as xr
 from libs import config
 from libs import dataset
 from libs import monitoring
@@ -62,9 +63,28 @@ class AbstractModel:
         test_gen = self.__create_timeseries_generator(test_ds)
         return self.__model.evaluate(test_gen, return_dict=True)
 
-    def predict(self, ds: dataset.AbstractDataset):
+    def predict(self, ds: dataset.AbstractDataset, basin, as_dataset: bool = True):
         gen = self.__create_timeseries_generator(ds)
-        self.__model.predict(gen)
+        predictions = self.__model.predict(gen)
+        if as_dataset:
+            return self.to_dataset(ds, predictions, basin)
+        else:
+            return predictions
+
+    def to_dataset(self, ds: dataset.AbstractDataset, predictions, basin):
+        target_start_date = np.datetime64(ds.start_date) + np.timedelta64(self._config.timesteps, 'D')\
+                            + np.timedelta64(self._config.offset,'D') - np.timedelta64(1, 'D')
+        res_ds = ds.timeseries.sel(time=slice(target_start_date, np.datetime64(ds.end_date)))
+
+        res_dict = {}
+        for i, param in enumerate(ds.target_cols):
+            non_nan_flags = np.invert(np.isnan(res_ds.sel(basin=basin)[param]))
+            res_times = res_ds.time[non_nan_flags]
+            res_dict[param] = xr.DataArray(predictions[:, i], coords=[res_times], dims=["time"])
+        ds_prediction = xr.Dataset(res_dict)
+        ds_prediction = ds_prediction.assign_coords({"basin": basin})
+        ds_prediction = ds_prediction.expand_dims("basin")
+        return ds_prediction
 
     def save_model(self, work_dir):
         storage_path = os.path.join(work_dir, "model")
