@@ -212,10 +212,15 @@ class LstmModel(AbstractModel):
             hidden_layers = params["hiddenLayers"]
             units = params["units"]
             if len(units) != hidden_layers:
-                raise config.ConfigError(f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")
             dropout = params["dropout"]
             if len(dropout) != hidden_layers:
-                raise config.ConfigError(f"Wrong number of dropout definitions: {len(dropout)}. Expected: {hidden_layers}")
+                raise config.ConfigError(
+                    f"Wrong number of dropout definitions: {len(dropout)}. Expected: {hidden_layers}")
+            return hidden_layers, units, dropout
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
             return hidden_layers, units, dropout
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
