@@ -34,6 +34,24 @@ class AbstractProcessor:
     def process(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
         pass
 
+    def scale(self, ds: dataset.AbstractDataset):
+        """
+        Performs a min/max scaling on all variables of a datset. If processor has been
+        fitted to a dataset, scaling will be done by using the minimum and maximum parameters from the fitting dataset.
+        Else, minimum and maximum parameters will be calculated from the given dataset.
+
+        Parameters
+        ----------
+        ds: dataset.AbstractDataset
+            Dataset that holds xarray.Dataset timeseries data which will be scaled.
+        """
+        if self.scaling_params is None:
+            min_params = ds.timeseries.min()
+            max_params = ds.timeseries.max()
+        else:
+            min_params, max_params = self.scaling_params
+        ds.timeseries = (ds.timeseries - min_params) / (max_params - min_params)
+
 
 class DefaultDatasetProcessor(AbstractProcessor):
     def __init__(self, scaling_params: tuple = None):
