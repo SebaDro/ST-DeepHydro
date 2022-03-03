@@ -4,8 +4,8 @@ import pandas as pd
 import unittest
 import xarray as xr
 
-from libs import processing
 from libs import dataset
+from libs import generator
 
 
 def create_streamflow_data():
@@ -84,7 +84,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_cols = ["streamflow"]
 
-        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
         exp_shape = (0, 8, 2)
         self.assertEqual(exp_shape, gen._get_input_shape())
@@ -96,7 +96,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_cols = ["streamflow"]
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
         exp_shape = (0, 6, 12, 14, 2)
         self.assertEqual(exp_shape, gen._get_input_shape())
@@ -110,7 +110,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         lag = timesteps + offset - 1
 
-        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False)
 
         # First, check the number of batches
@@ -171,7 +171,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the first two batches contains only inputs and targets for basin 1 and the other two batches
         # for basin 2
-        gen = processing.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, True)
 
         # First, check the number of batches
@@ -235,7 +235,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         lag = timesteps + offset - 1
         shape = (timesteps, len(self.ds_2d.timeseries.indexes["y"]), len(self.ds_2d.timeseries.indexes["x"]), len(feature_cols))
 
-        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, False, shape)
 
         # First, check the number of batches
@@ -292,7 +292,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the number of batches is lower
-        gen = processing.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
+        gen = generator.CustomTimeseriesGenerator(self.ds_2d, batch_size, timesteps, offset, feature_cols,
                                                    target_cols, True, shape)
 
         # First, check the number of batches

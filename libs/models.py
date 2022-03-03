@@ -180,9 +180,9 @@ class AbstractModel:
         """
         return tf.keras.models.load_model(storage_path)
 
-    def __create_timeseries_generator(self, ds: dataset.AbstractDataset):
-        return processing.CustomTimeseriesGenerator(ds, self._config.batch_size, self._config.timesteps,
-                                                    self._config.offset, ds.feature_cols, ds.target_cols, True)
+    def __create_timeseries_generator(self, ds: dataset.AbstractDataset, remove_nan: bool = True):
+        return generator.CustomTimeseriesGenerator(ds, self._config.batch_size, self._config.timesteps,
+                                                   self._config.offset, ds.feature_cols, ds.target_cols, remove_nan)
 
     @property
     def model(self):
