@@ -1,11 +1,9 @@
-import datetime
 import logging
 import math
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import xarray as xr
-import time
 
 from libs import dataset
 
@@ -51,6 +49,28 @@ class AbstractProcessor:
         else:
             min_params, max_params = self.scaling_params
         ds.timeseries = (ds.timeseries - min_params) / (max_params - min_params)
+
+    def rescale(self, ds: dataset.AbstractDataset):
+        min_params, max_params = self.scaling_params
+        ds.timeseries = ds.timeseries * (max_params - min_params) + min_params
+
+    def merge_input_and_prediction(self, ds_input: xr.Dataset, ds_prediction: xr.Dataset, pred_timeframe: bool = True):
+        variables = list(ds_prediction.keys())
+
+        if pred_timeframe:
+            start_date = ds_prediction.time[0]
+            end_date = ds_prediction.time[-1]
+        else:
+            start_date = ds_input.time[0]
+            end_date = ds_input.timeseries.time[-1]
+
+        ds_obs = ds_input.timeseries[variables].sel(time=slice(start_date, end_date))
+        ds_obs = ds_obs.rename(dict((param, param + "_obs") for param in variables))
+        ds_prediction = ds_prediction.rename(dict((param, param + "_pred") for param in variables))
+
+        return xr.merge([ds_prediction, ds_obs], join="left") \
+            if pred_timeframe \
+            else xr.merge([ds_obs, ds_prediction], join="right")
 
 
 class DefaultDatasetProcessor(AbstractProcessor):
@@ -161,7 +181,6 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
             if drop_na:
                 # Only consider streamflow values which are not NaN
                 non_nan_flags = np.invert(np.isnan(self.ds.timeseries.sel(basin=basin).streamflow))
-                # sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[non_nan_flags[lag:]]
                 sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[lag:][non_nan_flags.values[lag:]]
             else:
                 sel_indices = np.arange(0, len(self.ds.timeseries.sel(basin=basin).streamflow))[lag:]
