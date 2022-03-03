@@ -17,6 +17,20 @@ class AbstractModel:
         self._config = cfg
 
     def build(self, input_shape: tuple):
+        """
+        Builds the model architecture in accordance to the config.ModelConfig that has been passed for model
+        instantiation and a given input_shape.
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs. First axes contains the number of timesteps. Subsequent axis take into account
+            optional spatial dimensions and variable dimension as last axes. Batch size is not relevant.
+
+            One-dimensional: (timesteps, variables)
+            Two-dimensional: (timesteps, x, y, variables)
+
+        """
         self.__model = self._build_model(input_shape, self._config.params)
 
     def _build_model(self, input_shape: tuple, params: dict):
@@ -60,10 +74,41 @@ class AbstractModel:
         return self.__history
 
     def evaluate(self, test_ds: dataset.AbstractDataset):
+        """
+        Evaluates the trained model against the given dataset. The dataset will be wrapped by timeseries generator
+        which aims as input for model evaluating.
+
+        Parameters
+        ----------
+        test_ds: dataset.AbstractDataset
+            Input dataset for model evaluation
+
+        Returns
+        -------
+        Evaluation metrics
+
+        """
         test_gen = self.__create_timeseries_generator(test_ds)
         return self.__model.evaluate(test_gen, return_dict=True)
 
-    def predict(self, ds: dataset.AbstractDataset, basin, as_dataset: bool = True):
+    def predict(self, ds: dataset.AbstractDataset, basin: str, as_dataset: bool = True):
+        """
+        Uses the trained model the calculate predictions for the given dataset.
+
+        Parameters
+        ----------
+        ds: dataset.AbstractDataset
+            Input dataset for model predictions
+        basin: str
+            Basin ID
+        as_dataset: bool
+            Indicates if model predictions should be returned as raw numpy.ndarray or as xarray.Dataset
+
+        Returns
+        -------
+            Model predictions
+
+        """
         gen = self.__create_timeseries_generator(ds)
         predictions = self.__model.predict(gen)
         if as_dataset:
@@ -71,9 +116,29 @@ class AbstractModel:
         else:
             return predictions
 
-    def to_dataset(self, ds: dataset.AbstractDataset, predictions, basin):
-        target_start_date = np.datetime64(ds.start_date) + np.timedelta64(self._config.timesteps, 'D')\
-                            + np.timedelta64(self._config.offset,'D') - np.timedelta64(1, 'D')
+    def prediction_to_dataset(self, ds: dataset.AbstractDataset, predictions: np.ndarray, basin: str) -> xr.Dataset:
+        """
+        Creates a xarray.Dataset for raw model predictions. Therefore, the model outputs and the dataset that has been
+        used as model input for calculating the predictions are aligned. The resulting xarrary.Dataset has the same
+        coordinate dimensions as the input dataset but takes into account start and end date of the target variables
+        as well as NaN values.
+
+        Parameters
+        ----------
+        ds: dataset.AbstractDataset
+            Source dataset that has been used as model input for generating predictions
+        predictions: numpy.ndarray
+            Raw model output
+        basin: str
+            Basin ID
+
+        Returns
+        -------
+        Model predictions as xarray.Dataset
+
+        """
+        target_start_date = np.datetime64(ds.start_date) + np.timedelta64(self._config.timesteps, 'D') \
+                            + np.timedelta64(self._config.offset, 'D') - np.timedelta64(1, 'D')
         res_ds = ds.timeseries.sel(time=slice(target_start_date, np.datetime64(ds.end_date)))
 
         res_dict = {}
@@ -86,11 +151,33 @@ class AbstractModel:
         ds_prediction = ds_prediction.expand_dims("basin")
         return ds_prediction
 
-    def save_model(self, work_dir):
-        storage_path = os.path.join(work_dir, "model")
+    def save_model(self, storage_path: str):
+        """
+        Stores a trained model within the given directory.
+
+        Parameters
+        ----------
+        storage_path: str
+            Path to the storage directory.
+
+        """
+        storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
 
     def load_model(self, storage_path):
+        """
+        Loads a trained model from a given directory.
+
+        Parameters
+        ----------
+        storage_path: str
+            Path to the storage directory.
+
+        Returns
+        -------
+        A trained model instance
+
+        """
         return tf.keras.models.load_model(storage_path)
 
     def __create_timeseries_generator(self, ds: dataset.AbstractDataset):
