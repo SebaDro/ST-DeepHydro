@@ -20,8 +20,8 @@ class AbstractDataLoader:
             Path to the directory that contains forcings timeseries data. The datasets may live in subdirectories of the
             speciified directory.
         streamflow_dir: str
-            Path to the directory that contains streamflow timeseries data. The datasets may live in subdirectories of the
-            speciified directory.
+            Path to the directory that contains streamflow timeseries data. The datasets may live in subdirectories of
+            the speciified directory.
         forcings_vars: list
             List of forcings variable names. The variables will be used for subsetting the forcings dataset.
         streamflow_vars: list
@@ -34,7 +34,7 @@ class AbstractDataLoader:
         self.__streamflow_variables = streamflow_vars
 
     @classmethod
-    def from_config(cls, data_cfg: config.DataConfig, dataset_cfg: config.DatasetConfig):
+    def from_config(cls, data_cfg: config.DataConfig):
         """
         Creates a DataLoader instance from configurations.
 
@@ -43,10 +43,6 @@ class AbstractDataLoader:
         data_cfg: config.DataConfig
             DataConfig that holds data configuration parameters, such as basins, data directories and variables which
             will be used for loading and subsetting the forcings and streamflow datasets.
-        dataset_cfg: config.DatasetConfig
-            DatasetConfig that holds configuration parameters, such as start and end date for subsetting the
-            forcings and streamflow datasets.
-
 
         Returns
         -------
@@ -87,9 +83,9 @@ class CamelsUSDataLoader(AbstractDataLoader):
         if basin is not None:
             return self.load_single_dataset(start_date, end_date, basin)
         else:
-            return self.load_full_dataset()
+            return self.load_full_dataset(start_date, end_date)
 
-    def load_single_dataset(self, start_date: str, end_date: str, basin: str,) -> dataset.LumpedDataset:
+    def load_single_dataset(self, start_date: str, end_date: str, basin: str, normalize_streamflow: bool = False) -> dataset.LumpedDataset:
         """
         Loads a single Camels-US dataset for the specified basin as LumpedDataset. The LumpedDataset wraps lumped
         forcings and timeseries data for that basin as xarray.Dataset.
@@ -102,6 +98,9 @@ class CamelsUSDataLoader(AbstractDataLoader):
             String that represents a date. It will be used as start date for subsetting the timeseries datasets.
         end_date: str
             String that represents a date. It will be used as end date for subsetting the timeseries datasets.
+        normalize_streamflow: bool
+            Indicates if streamflow variables should be normalized by the basin area. If true streamflow will be
+            divided by the basin area and converted from cft/s into mm/day. Default is False.
 
         Returns
         -------
@@ -109,16 +108,17 @@ class CamelsUSDataLoader(AbstractDataLoader):
             A LumpedDataset that holds lumped forcings and timeseries data
 
         """
-        ds_timeseries = self.load_xarray_dataset(basin, False)
+        ds_timeseries = self.load_xarray_dataset(start_date, end_date, basin, normalize_streamflow)
 
         return dataset.LumpedDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
                                      start_date, end_date)
 
     def load_full_dataset(self, start_date: str, end_date: str, as_dask: bool = False) -> dataset.LumpedDataset:
         """
-        Loads several Camels-US datasets as one single LumpedDataset. The LumpedDataset wraps lumped
-        forcings and timeseries data for all basins the loader has been initialized with as one single
-        xarray.Dataset. Each basin ID will be used as dimension coordinate.
+        Loads several Camels-US datasets as one single LumpedDataset. The LumpedDataset wraps lumped forcings and
+        timeseries data for all basins the loader has been initialized with as one single xarray.Dataset. Each basin
+        ID will be used as dimension coordinate. Note, that streamflow will be normalized using each basin's area and
+        converted from cft/s into mm/day.
 
         Parameters
         ----------
@@ -191,6 +191,7 @@ class CamelsUSDataLoader(AbstractDataLoader):
         ds_timeseries = xr.Dataset.from_dataframe(df_merged)
         ds_timeseries = ds_timeseries.rename({"index": "time"})
         ds_timeseries = ds_timeseries.assign_coords({"basin": basin})
+        ds_timeseries = ds_timeseries.expand_dims("basin")
 
         return ds_timeseries
 
@@ -274,9 +275,8 @@ def convert_streamflow(streamflow, area: float):
     return streamflow * 10 ** 3  # [mm/d]
 
 
-def factory(data_cfg: config.DataConfig, dataset_cfg: config.DatasetConfig) -> AbstractDataLoader:
+def factory(data_cfg: config.DataConfig) -> AbstractDataLoader:
     if data_cfg.forcings_cfg.data_type == "camels-us" and data_cfg.streamflow_cfg.data_type == "camels-us":
-        return CamelsUSDataLoader.from_config(data_cfg, dataset_cfg)
+        return CamelsUSDataLoader.from_config(data_cfg)
     raise ValueError("No data loader exists for the specified dataset types Dataset types '{}' and '{}'."
                      .format(data_cfg.forcings_cfg.data_type, data_cfg.streamflow_cfg.data_type))
-
