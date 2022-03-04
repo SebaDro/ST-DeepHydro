@@ -1,14 +1,55 @@
+import copy
 import logging
-import math
-import numpy as np
-import pandas as pd
-import tensorflow as tf
 import xarray as xr
 
 from libs import dataset
 
 
 logger = logging.getLogger(__name__)
+
+
+def merge_observations_and_predictions(ds_observation: xr.Dataset, ds_prediction: xr.Dataset,
+                                       use_pred_timeframe: bool = True) -> xr.Dataset:
+    """
+    Merges two xarray.Datasets which contain observation and prediction timeseries data. Only variables that are
+    present within the prediction dataset will be considered for subsetting the observation dataset. For each
+    variable the resulting xarray.Dataset contains two variables, each one named by the original variable but with
+    a prefix indicating observations or predictions. E.g. if the prediction dataset contains a variable named
+    "streamflow", the resulting dataset contains two variables ""streamflow_obs" and "streamflow_pred".
+    By default the predictions timeframe will be used for merging both datasets.
+
+    Parameters
+    ----------
+    ds_observation: xarray.Dataset
+        Dataset that contains observations
+    ds_prediction
+        Dataset that contains predictions
+    use_pred_timeframe: bool
+        If True the prediction dataset timeframe should be used for merging both datasets. Otherwise the observation
+        dataset timeframe will be preserved.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset containing merged observation and prediction timeseries
+
+    """
+    variables = list(ds_prediction.keys())
+
+    if use_pred_timeframe:
+        start_date = ds_prediction.time[0]
+        end_date = ds_prediction.time[-1]
+    else:
+        start_date = ds_observation.time[0]
+        end_date = ds_observation.time[-1]
+
+    ds_obs = ds_observation[variables].sel(time=slice(start_date, end_date))
+    ds_obs = ds_obs.rename(dict((param, param + "_obs") for param in variables))
+    ds_prediction = ds_prediction.rename(dict((param, param + "_pred") for param in variables))
+
+    return xr.merge([ds_prediction, ds_obs], join="left") \
+        if use_pred_timeframe \
+        else xr.merge([ds_prediction, ds_obs], join="right")
 
 
 class AbstractProcessor:
@@ -32,45 +73,27 @@ class AbstractProcessor:
     def process(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
         pass
 
-    def scale(self, ds: dataset.AbstractDataset):
+    def scale(self, ds: xr.Dataset):
         """
-        Performs a min/max scaling on all variables of a datset. If processor has been
-        fitted to a dataset, scaling will be done by using the minimum and maximum parameters from the fitting dataset.
-        Else, minimum and maximum parameters will be calculated from the given dataset.
+        Performs a min/max scaling on all variables of a xarray.Dataset. If the current processor instance has been
+        fit to a dataset, scaling will be done by using the minimum and maximum parameters from the fitting dataset.
+        Else, minimum and maximum parameters will be calculated from the given xarray.Dataset.
 
         Parameters
         ----------
-        ds: dataset.AbstractDataset
-            Dataset that holds xarray.Dataset timeseries data which will be scaled.
+        ds: xarray.Dataset
+            Timeseries data which will be scaled.
         """
         if self.scaling_params is None:
-            min_params = ds.timeseries.min()
-            max_params = ds.timeseries.max()
+            min_params = ds.min()
+            max_params = ds.max()
         else:
             min_params, max_params = self.scaling_params
-        ds.timeseries = (ds.timeseries - min_params) / (max_params - min_params)
+        return (ds - min_params) / (max_params - min_params)
 
-    def rescale(self, ds: dataset.AbstractDataset):
+    def rescale(self, ds: xr.Dataset):
         min_params, max_params = self.scaling_params
-        ds.timeseries = ds.timeseries * (max_params - min_params) + min_params
-
-    def merge_input_and_prediction(self, ds_input: xr.Dataset, ds_prediction: xr.Dataset, pred_timeframe: bool = True):
-        variables = list(ds_prediction.keys())
-
-        if pred_timeframe:
-            start_date = ds_prediction.time[0]
-            end_date = ds_prediction.time[-1]
-        else:
-            start_date = ds_input.time[0]
-            end_date = ds_input.timeseries.time[-1]
-
-        ds_obs = ds_input.timeseries[variables].sel(time=slice(start_date, end_date))
-        ds_obs = ds_obs.rename(dict((param, param + "_obs") for param in variables))
-        ds_prediction = ds_prediction.rename(dict((param, param + "_pred") for param in variables))
-
-        return xr.merge([ds_prediction, ds_obs], join="left") \
-            if pred_timeframe \
-            else xr.merge([ds_obs, ds_prediction], join="right")
+        return ds * (max_params - min_params) + min_params
 
 
 class DefaultDatasetProcessor(AbstractProcessor):
@@ -128,7 +151,8 @@ class DefaultDatasetProcessor(AbstractProcessor):
             logging.warning("Processor has not been fit to a dataset before. Thus, it will be fitted to the provided "
                             "dataset.")
             self.__fit_scaling_params(ds)
-        ds.normalize(*self.scaling_params)
+        ds = copy.copy(ds)
+        ds.timeseries = self.scale(ds.timeseries)
         return ds
 
     def __fit_scaling_params(self, ds: dataset.AbstractDataset):
