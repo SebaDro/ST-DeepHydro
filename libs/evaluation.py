@@ -1,7 +1,10 @@
-from typing import Union
 import logging
+import os
 import xarray as xr
+from typing import Union
+
 from libs import processing
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ def nse_metric(observations: xr.DataArray, predictions: xr.DataArray, as_dataset
     """
     nse = 1 - xr.DataArray.sum((predictions - observations) ** 2) / xr.DataArray.sum(
         (observations - observations.mean()) ** 2)
-    if as_dataset:
+    if as_dataset and basin is not None:
         return xr.Dataset(dict(nse=(["basin"], [nse])), coords=dict(basin=[basin]))
     else:
         return nse
@@ -67,9 +70,9 @@ class Evaluation:
         Parameters
         ----------
         ds_obs: xarray.Dataset
-            Dataset containing obsrvations
+            Dataset containing observations
         ds_pred: xarray.Dataset
-            Dataset containing obsrvations
+            Dataset containing predictions
         target_var: str
             Name of the target variable, which will be used to create target_obs and target_pred variables in the
             common dataset.
@@ -95,3 +98,8 @@ class Evaluation:
             self.append_evaluation_results(ds_res)
         else:
             return ds_res
+
+    def save(self, out_dir: str, pref: str = None):
+        name = "prediction.nc" if pref is None else f"{pref}_prediction.nc"
+        out_path = os.path.join(out_dir, name)
+        self.ds_results.to_netcdf(out_path)
