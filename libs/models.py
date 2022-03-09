@@ -16,6 +16,18 @@ class AbstractModel:
         self.__eval_results = None
         self._config = cfg
 
+    @property
+    def model(self):
+        return self.__model
+
+    @model.setter
+    def model(self, model):
+        self.__model = model
+
+    @property
+    def history(self):
+        return self.__history
+
     def build(self, input_shape: tuple):
         """
         Builds the model architecture in accordance to the config.ModelConfig that has been passed for model
@@ -73,23 +85,37 @@ class AbstractModel:
 
         return self.__history
 
-    def evaluate(self, test_ds: dataset.AbstractDataset):
+    def evaluate(self, test_ds: dataset.AbstractDataset, as_dataset: bool = False, basin: str = None):
         """
         Evaluates the trained model against the given dataset. The dataset will be wrapped by timeseries generator
-        which aims as input for model evaluating.
+        which aims as input for model evaluating. All metrics that have been specified as part of the model
+        configuration will be calculated.
 
         Parameters
         ----------
         test_ds: dataset.AbstractDataset
             Input dataset for model evaluation
+        as_dataset: bool
+            Indicates whether the calculated evaluation metrics should be returned as raw value or as xarray.Dataset
+            indexed by the basin ID.
+        basin: str
+            ID of the basin to calculate the evaluation metrics for
 
         Returns
         -------
-        Evaluation metrics
+        Union[float, xr.Dataset]
+            Evaluation metric either as dictionary or as basin indexed xarray.Dataset
 
         """
         test_gen = self.__create_timeseries_generator(test_ds)
-        return self.__model.evaluate(test_gen, return_dict=True)
+        result = self.__model.evaluate(test_gen, return_dict=True)
+        if as_dataset and basin is not None:
+            res_dict = {}
+            for key in result:
+                res_dict[key] = (["basin"], [result[key]])
+            return xr.Dataset(res_dict, coords=dict(basin=[basin]))
+        else:
+            return result
 
     def predict(self, ds: dataset.AbstractDataset, basin: str, as_dataset: bool = True, remove_nan: bool = False):
         """
@@ -175,33 +201,9 @@ class AbstractModel:
         storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
 
-    def load_model(self, storage_path):
-        """
-        Loads a trained model from a given directory.
-
-        Parameters
-        ----------
-        storage_path: str
-            Path to the storage directory.
-
-        Returns
-        -------
-        A trained model instance
-
-        """
-        return tf.keras.models.load_model(storage_path)
-
     def __create_timeseries_generator(self, ds: dataset.AbstractDataset, remove_nan: bool = True):
         return generator.CustomTimeseriesGenerator(ds, self._config.batch_size, self._config.timesteps,
                                                    self._config.offset, ds.feature_cols, ds.target_cols, remove_nan)
-
-    @property
-    def model(self):
-        return self.__model
-
-    @property
-    def history(self):
-        return self.__history
 
 
 class LstmModel(AbstractModel):
@@ -241,3 +243,24 @@ def factory(cfg: config.ModelConfig) -> AbstractModel:
     if cfg.model_type == "lstm":
         return LstmModel(cfg)
     raise ValueError("No model for the given type '{}' available.".format(cfg.model_type))
+
+
+def load_model(storage_path: str, cfg: config.ModelConfig):
+    """
+    Loads a trained model from a given directory.
+
+    Parameters
+    ----------
+    storage_path: str
+        Path to the storage directory.
+    cfg: str
+        Model configuration
+
+    Returns
+    -------
+    A trained model instance
+
+    """
+    model = factory(cfg)
+    model.model = tf.keras.models.load_model(storage_path)
+    return model
