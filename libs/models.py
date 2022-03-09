@@ -234,6 +234,39 @@ class LstmModel(AbstractModel):
             return hidden_layers, units, dropout
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
+
+class CnnLstmModel(AbstractModel):
+
+    def _build_model(self, input_shape: tuple, params: dict):
+        hidden_layers, units, dropout = self._get_and_validate_params(params)
+
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu"),
+                                            input_shape=input_shape),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()),
+        ])
+        for i in range(0, hidden_layers - 1):
+            model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
+        model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], use_bias=True))
+        model.add(tf.keras.layers.Dense(units=1))
+        return model
+
+    def _get_and_validate_params(self, params: dict):
+        try:
+            lstm_params = params["lstm"]
+            hidden_layers = lstm_params["hiddenLayers"]
+            units = lstm_params["units"]
+            if len(units) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")
+            dropout = lstm_params["dropout"]
+            if len(dropout) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of dropout definitions: {len(dropout)}. Expected: {hidden_layers}")
             return hidden_layers, units, dropout
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
@@ -242,6 +275,8 @@ class LstmModel(AbstractModel):
 def factory(cfg: config.ModelConfig) -> AbstractModel:
     if cfg.model_type == "lstm":
         return LstmModel(cfg)
+    if cfg.model_type == "cnn-lstm":
+        return CnnLstmModel(cfg)
     raise ValueError("No model for the given type '{}' available.".format(cfg.model_type))
 
 
