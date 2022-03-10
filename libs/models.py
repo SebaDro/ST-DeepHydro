@@ -43,9 +43,10 @@ class AbstractModel:
             Two-dimensional: (timesteps, x, y, variables)
 
         """
-        self.__model = self._build_model(input_shape, self._config.params)
+        param_tuple = self._get_and_validate_params(self._config.params)
+        self.__model = self._build_model(input_shape, param_tuple)
 
-    def _build_model(self, input_shape: tuple, params: dict):
+    def _build_model(self, input_shape: tuple, params: tuple):
         raise NotImplementedError
 
     def _get_and_validate_params(self, params: dict):
@@ -208,8 +209,8 @@ class AbstractModel:
 
 class LstmModel(AbstractModel):
 
-    def _build_model(self, input_shape: tuple, params: dict):
-        hidden_layers, units, dropout = self._get_and_validate_params(params)
+    def _build_model(self, input_shape: tuple, params: tuple):
+        hidden_layers, units, dropout = params
 
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=input_shape))
@@ -238,12 +239,12 @@ class LstmModel(AbstractModel):
 
 class CnnLstmModel(AbstractModel):
 
-    def _build_model(self, input_shape: tuple, params: dict):
-        hidden_layers, units, dropout = self._get_and_validate_params(params)
+    def _build_model(self, input_shape: tuple, params: tuple):
+        hidden_layers, units, dropout = params
 
         model = tf.keras.models.Sequential([
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu"),
-                                            input_shape=input_shape),
+            tf.keras.Input(shape=input_shape),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
             tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
