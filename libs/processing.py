@@ -64,13 +64,13 @@ class AbstractProcessor:
     def scaling_params(self, value):
         self.__scaling_params = value
 
-    def fit(self, ds: dataset.AbstractDataset):
+    def fit(self, ds: dataset.HydroDataset):
         pass
 
-    def process_and_fit(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
+    def process_and_fit(self, ds: dataset.HydroDataset) -> dataset.HydroDataset:
         pass
 
-    def process(self, ds: dataset.AbstractDataset) -> dataset.AbstractDataset:
+    def process(self, ds: dataset.HydroDataset) -> dataset.HydroDataset:
         pass
 
     def scale(self, ds: xr.Dataset):
@@ -109,7 +109,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
         """
         super().__init__(scaling_params)
 
-    def fit(self, ds: dataset.AbstractDataset):
+    def fit(self, ds: dataset.HydroDataset):
         """
         Fits the processor to a dataset which usually should be the training dataset. Fitting means, the processor will
         derive various parameters from the specified dataset which will be used for several subsequent processing steps.
@@ -121,13 +121,13 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         Parameters
         ----------
-        ds: dataset.AbstractDataset
+        ds: dataset.HydroDataset
             Dataset that holds timeseries data as xarray.Dataset
 
         """
         self.__fit_scaling_params(ds)
 
-    def process(self, ds: dataset.AbstractDataset):
+    def process(self, ds: dataset.HydroDataset):
         """
         Performs several processing steps on a dataset.LumpedDataset.
 
@@ -139,12 +139,12 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         Parameters
         ----------
-        ds: dataset.AbstractDataset
+        ds: dataset.HydroDataset
             Dataset that will be processed
 
         Returns
         -------
-            The resulting dataset.LumpedDataset after performing various processing steps on it
+            The resulting dataset.BasinDataset after performing various processing steps on it
 
         """
         if self.scaling_params is None:
@@ -155,5 +155,5 @@ class DefaultDatasetProcessor(AbstractProcessor):
         ds.timeseries = self.scale(ds.timeseries)
         return ds
 
-    def __fit_scaling_params(self, ds: dataset.AbstractDataset):
+    def __fit_scaling_params(self, ds: dataset.HydroDataset):
         self.scaling_params = (ds.timeseries.min(), ds.timeseries.max())

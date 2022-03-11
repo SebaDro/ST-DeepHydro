@@ -7,7 +7,7 @@ from libs import dataset
 
 class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
-    def __init__(self, ds: dataset.AbstractDataset, batch_size: int, timesteps: int, offset: int, feature_cols: list,
+    def __init__(self, ds: dataset.HydroDataset, batch_size: int, timesteps: int, offset: int, feature_cols: list,
                  target_cols: list, drop_na: bool = False, input_shape: tuple = None):
         """
         A custom TimeseriesGenerator that creates batches of timeseries from a xarray.Dataset and optionally takes
@@ -15,7 +15,7 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
         Parameters
         ----------
-        ds: dataset.Dataset
+        ds: dataset.HydroDataset
             Dataset that holds forcings and streamflow timeseries data
         batch_size: int
             Size of the batches that will be created

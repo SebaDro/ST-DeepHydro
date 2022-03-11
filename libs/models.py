@@ -52,7 +52,7 @@ class AbstractModel:
     def _get_and_validate_params(self, params: dict):
         raise NotImplementedError
 
-    def compile_and_fit(self, training_ds: dataset.AbstractDataset, validation_ds: dataset.AbstractDataset,
+    def compile_and_fit(self, training_ds: dataset.HydroDataset, validation_ds: dataset.HydroDataset,
                         monitor: monitoring.TrainingMonitor = None) -> tf.keras.callbacks.History:
         """
         Compiles and fits a model using the given model training and validation datasets. For fitting the model
@@ -60,9 +60,9 @@ class AbstractModel:
 
         Parameters
         ----------
-        training_ds: dataset.AbstractDataset
+        training_ds: dataset.HydroDataset
             Dataset that will be used for training
-        validation_ds: dataset.AbstractDataset
+        validation_ds: dataset.HydroDataset
             Dataset that will be used for validation
         monitor: monitoring.TrainingMonitor
             Encapsulates Tensorflow callback objects used for monitoring training progress
@@ -86,7 +86,7 @@ class AbstractModel:
 
         return self.__history
 
-    def evaluate(self, test_ds: dataset.AbstractDataset, as_dataset: bool = False, basin: str = None):
+    def evaluate(self, test_ds: dataset.HydroDataset, as_dataset: bool = False, basin: str = None):
         """
         Evaluates the trained model against the given dataset. The dataset will be wrapped by timeseries generator
         which aims as input for model evaluating. All metrics that have been specified as part of the model
@@ -94,7 +94,7 @@ class AbstractModel:
 
         Parameters
         ----------
-        test_ds: dataset.AbstractDataset
+        test_ds: dataset.HydroDataset
             Input dataset for model evaluation
         as_dataset: bool
             Indicates whether the calculated evaluation metrics should be returned as raw value or as xarray.Dataset
@@ -118,13 +118,13 @@ class AbstractModel:
         else:
             return result
 
-    def predict(self, ds: dataset.AbstractDataset, basin: str, as_dataset: bool = True, remove_nan: bool = False):
+    def predict(self, ds: dataset.HydroDataset, basin: str, as_dataset: bool = True, remove_nan: bool = False):
         """
         Uses the trained model the calculate predictions for the given dataset.
 
         Parameters
         ----------
-        ds: dataset.AbstractDataset
+        ds: dataset.HydroDataset
             Input dataset for model predictions
         basin: str
             Basin ID
@@ -146,7 +146,7 @@ class AbstractModel:
         else:
             return predictions
 
-    def prediction_to_dataset(self, ds: dataset.AbstractDataset, predictions: np.ndarray, basin: str,
+    def prediction_to_dataset(self, ds: dataset.HydroDataset, predictions: np.ndarray, basin: str,
                               remove_nan: bool = False) -> xr.Dataset:
         """
         Creates a xarray.Dataset for raw model predictions. Therefore, the model outputs and the dataset that has been
@@ -155,7 +155,7 @@ class AbstractModel:
 
         Parameters
         ----------
-        ds: dataset.AbstractDataset
+        ds: dataset.HydroDataset
             Source dataset that has been used as model input for generating predictions
         predictions: numpy.ndarray
             Raw model output
@@ -202,7 +202,7 @@ class AbstractModel:
         storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
 
-    def __create_timeseries_generator(self, ds: dataset.AbstractDataset, remove_nan: bool = True):
+    def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
         return generator.CustomTimeseriesGenerator(ds, self._config.batch_size, self._config.timesteps,
                                                    self._config.offset, ds.feature_cols, ds.target_cols, remove_nan)
 
