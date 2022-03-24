@@ -70,12 +70,33 @@ def create_two_dimensional_dataset():
                                 feature_variables=["temp", "prcp"], target_variables=["streamflow"])
 
 
+def create_two_dimensional_joined_dataset():
+    dates = pd.date_range("2021", periods=20)
+    x = np.arange(0, 14)
+    y = np.arange(0, 12)
+    basins = ["123"]
+
+    temp_data = np.random.uniform(low=0, high=10, size=(20, 12, 14))
+    prcp_data = np.random.uniform(low=0, high=10, size=(20, 12, 14))
+    streamflow_data = np.random.uniform(low=0, high=10, size=(1, 20))
+    na_indices = [9, 10, 11, 18]
+    streamflow_data[0, na_indices] = np.NaN
+
+    temp_xr = xr.DataArray(temp_data, coords=[dates, y, x], dims=["time", "y", "x"])
+    prcp_xr = xr.DataArray(prcp_data, coords=[dates, y, x], dims=["time", "y", "x"])
+    streamflow_xr = xr.DataArray(streamflow_data, coords=[basins, dates], dims=["basin", "time"])
+
+    return dataset.HydroDataset(xr.Dataset(dict(temp=temp_xr, prcp=prcp_xr, streamflow=streamflow_xr)),
+                                feature_variables=["temp", "prcp"], target_variables=["streamflow"])
+
+
 class TestCustomTimeseriesGenerator(unittest.TestCase):
     def setUp(self):
         self.basin_1 = "123"
         self.basin_2 = "456"
         self.ds = create_one_dimensional_dataset()
         self.ds_2d = create_two_dimensional_dataset()
+        self.ds_2d_joined = create_two_dimensional_joined_dataset()
 
     def test_get_input_shape_1d(self):
         batch_size = 6
@@ -237,7 +258,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         timesteps, len(self.ds_2d.timeseries.indexes["y"]), len(self.ds_2d.timeseries.indexes["x"]), len(feature_cols))
 
         gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_cols, False, shape)
+                                                  target_cols, False, False, shape)
 
         # First, check the number of batches
         # Substract time lag from 20 timesteps for only one basin
@@ -284,7 +305,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         np.testing.assert_array_equal(x1, x2)
         np.testing.assert_array_equal(y1, y2)
 
-    def test_timeseries_generation_2d_with_nan(self):
+    def test_timeseries_generation_2d_without_nan(self):
         batch_size = 6
         timesteps = 4
         offset = 1
@@ -298,7 +319,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the number of batches is lower
         gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_cols, True, shape)
+                                                  target_cols, True, False, shape)
 
         # First, check the number of batches
         # Substract time lag and 4 NaN values from 20 timesteps
@@ -336,6 +357,66 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         x1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[
              -(timesteps + offset):-1]
         y1 = np.moveaxis(self.ds_2d.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
+        x2 = inputs[5]
+        y2 = targets[5]
+        # Last batch should contain 6 elements
+        self.assertEqual(6, len(inputs))
+        np.testing.assert_array_equal(x1, x2)
+        np.testing.assert_array_equal(y1, y2)
+
+
+    def test_timeseries_generation_2d_with_joined_output(self):
+        batch_size = 6
+        timesteps = 4
+        offset = 1
+        feature_cols = ["temp", "prcp"]
+        target_cols = ["streamflow"]
+
+        lag = timesteps + offset - 1
+        shape = (timesteps, len(self.ds_2d_joined.timeseries.indexes["y"]),
+                 len(self.ds_2d_joined.timeseries.indexes["x"]), len(feature_cols))
+
+        # Note that the generator does not consider create input/target pairs for targets with NaN values.
+        # As a result the number of batches is lower
+        gen = generator.CustomTimeseriesGenerator(self.ds_2d_joined.timeseries, batch_size, timesteps, offset,
+                                                  feature_cols, target_cols, True, True, shape)
+
+        # First, check the number of batches
+        # Substract time lag and 4 NaN values from 20 timesteps
+        nr_nan = 4
+        exp_batches = math.ceil((20 - lag - nr_nan) / batch_size)
+        self.assertEqual(exp_batches, len(gen))
+
+        # Then check first, middle and last batches
+        # First batch
+        batch = 0
+        inputs, targets = gen[batch]
+        x1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[
+             batch * batch_size:batch * batch_size + timesteps]
+        y1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[
+            batch * batch_size + timesteps]
+        x2 = inputs[0]
+        y2 = targets[0]
+        np.testing.assert_array_equal(x1, x2)
+        np.testing.assert_array_equal(y1, y2)
+
+        # Last batch (due to removal of NaN, the second batch is also the last batch)
+        batch = 1
+        inputs, targets = gen[batch]
+        # Due to NaN values, now the target at index position 13 is first target value of the second batch
+        i_target = 13
+        x1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[
+             i_target - timesteps:i_target]
+        y1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[i_target]
+        x2 = inputs[0]
+        y2 = targets[0]
+        np.testing.assert_array_equal(x1, x2)
+        np.testing.assert_array_equal(y1, y2)
+
+        # Check also last values of last batch
+        x1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[feature_cols].to_array().values, 0, -1)[
+             -(timesteps + offset):-1]
+        y1 = np.moveaxis(self.ds_2d_joined.timeseries.sel(basin=self.basin_1)[target_cols].to_array().values, 0, -1)[-1]
         x2 = inputs[5]
         y2 = targets[5]
         # Last batch should contain 6 elements
