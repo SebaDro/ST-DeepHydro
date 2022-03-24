@@ -204,7 +204,7 @@ class AbstractModel:
 
     def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
         return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                   self._config.offset, ds.feature_cols, ds.target_cols, remove_nan)
+                                                   self._config.offset, ds.feature_cols, ds.target_cols, remove_nan, False)
 
 
 class LstmModel(AbstractModel):

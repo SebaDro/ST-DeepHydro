@@ -8,7 +8,7 @@ import xarray as xr
 class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
 
     def __init__(self, xds: xr.Dataset, batch_size: int, timesteps: int, offset: int, feature_vars: list,
-                 target_vars: list, drop_na: bool = True, input_shape: tuple = None):
+                 target_vars: list, drop_na: bool = True, joined_output: bool = False, input_shape: tuple = None):
         """
         A custom TimeseriesGenerator that creates batches of timeseries windows for input and target variables from a
         xarray.Dataset. The generator optionally takes into account ignoring NaN values.
@@ -36,19 +36,30 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
             computed automatically from the given xarray.Dataset.
 
         """
-        self.xds = xds
+        if all(i in xds.coords for i in ["basin", "time", "y", "x"]):
+            self.xds = xds.transpose("basin", "time", "y", "x")
+        elif all(i in xds.coords for i in ["basin", "time"]):
+            self.xds = xds.transpose("basin", "time")
+        else:
+            raise ValueError(f"Coordinates should contain one of the sets: ['basin', 'time'],"
+                             f"['basin', 'time', 'y', 'x']. Actual coordinates are: {list(xds.coords)}")
+
         self.batch_size = batch_size
         self.timesteps = timesteps
         self.offset = offset
         self.feature_cols = feature_vars
         self.target_cols = target_vars
         self.drop_na = drop_na
+        self.joined_output = joined_output
         self.input_shape = input_shape
-        self.idx_dict = self.__get_idx_df(drop_na)
+        self.idx_dict = self.__get_idx_df(drop_na, joined_output)
         self.ds_inputs = self.xds[feature_vars].to_array()
-        self.ds_targets = self.xds[target_vars].to_array()
+        if joined_output:
+            self.ds_targets = self.xds[[target_vars[0]]].to_array()
+        else:
+            self.ds_targets = self.xds[target_vars].to_array()
 
-    def __get_idx_df(self, drop_na):
+    def __get_idx_df(self, drop_na: bool, joined_output: bool):
         lag = self.timesteps + self.offset - 1
 
         date_idx_list = []
@@ -63,7 +74,11 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
                 sel_indices = np.arange(0, len(self.xds.sel(basin=basin).streamflow))[lag:]
             basin_idx_list.extend([i] * len(sel_indices))
             date_idx_list.extend(sel_indices)
-        return pd.DataFrame({"basin_idx": basin_idx_list, "time_idx": date_idx_list})
+        df_idx = pd.DataFrame({"basin_idx": basin_idx_list, "time_idx": date_idx_list})
+        if joined_output:
+            df_idx = df_idx.groupby("time_idx")["basin_idx"].apply(list).reset_index(name="basin_idx")
+            df_idx = df_idx[df_idx["basin_idx"].apply(len) == len(self.xds.basin.values)]
+        return df_idx
 
     def __len__(self):
         n_samples = len(self.idx_dict)
@@ -77,16 +92,26 @@ class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
         else:
             shape = self._get_input_shape()
             inputs = np.empty(shape)
-        targets = np.empty((0, len(self.target_cols)))
+        if self.joined_output:
+            targets = np.empty((0, len(self.xds.basin.values)))
+        else:
+            targets = np.empty((0, len(self.target_cols)))
 
         for index, row in df_batch.iterrows():
             start_date_idx = row.time_idx - self.timesteps
             end_date_idx = row.time_idx - self.offset + 1
-            forcings_values = self.ds_inputs[:, row.basin_idx, start_date_idx:end_date_idx].values
-            streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
-            forcings_values = np.moveaxis(forcings_values, 0, -1)
-            inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
-            targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
+            if self.joined_output:
+                forcings_values = self.ds_inputs[:, start_date_idx:end_date_idx, ...].values
+                forcings_values = np.moveaxis(forcings_values, 0, -1)
+                inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
+                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
+                targets = np.vstack([targets, streamflow_values])
+            else:
+                forcings_values = self.ds_inputs[:, row.basin_idx, start_date_idx:end_date_idx, ...].values
+                forcings_values = np.moveaxis(forcings_values, 0, -1)
+                inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
+                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
+                targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
 
         return inputs, targets
 
