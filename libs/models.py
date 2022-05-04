@@ -274,11 +274,32 @@ class CnnLstmModel(AbstractModel):
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
 
+class ConvLstmModel(AbstractModel):
+
+    def _build_model(self, input_shape: tuple, params: dict):
+        model = tf.keras.models.Sequential([
+            tf.keras.Input(shape=input_shape),
+            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", return_sequences=True),
+            tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
+            # tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", return_sequences=True),
+            # tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
+            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu"),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(1)
+        ])
+        return model
+
+    def _get_and_validate_params(self, params: dict):
+        return None
+
+
 def factory(cfg: config.ModelConfig) -> AbstractModel:
     if cfg.model_type == "lstm":
         return LstmModel(cfg)
     if cfg.model_type == "cnn-lstm":
         return CnnLstmModel(cfg)
+    if cfg.model_type == "convlstm":
+        return ConvLstmModel(cfg)
     raise ValueError("No model for the given type '{}' available.".format(cfg.model_type))
 
 
