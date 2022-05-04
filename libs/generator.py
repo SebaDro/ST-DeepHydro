@@ -1,11 +1,11 @@
 import math
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+from tensorflow.keras.utils import Sequence
 import xarray as xr
 
 
-class CustomTimeseriesGenerator(tf.keras.utils.Sequence):
+class CustomTimeseriesGenerator(Sequence):
 
     def __init__(self, xds: xr.Dataset, batch_size: int, timesteps: int, offset: int, feature_vars: list,
                  target_var: str, drop_na: bool = True, joined_output: bool = False, input_shape: tuple = None):
