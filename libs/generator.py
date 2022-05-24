@@ -8,7 +8,7 @@ import xarray as xr
 class CustomTimeseriesGenerator(Sequence):
 
     def __init__(self, xds: xr.Dataset, batch_size: int, timesteps: int, offset: int, feature_vars: list,
-                 target_var: str, drop_na: bool = True, joined_output: bool = False, input_shape: tuple = None):
+                 target_var: str, drop_na: bool = True, joined_features: bool = False, input_shape: tuple = None):
         """
         A custom TimeseriesGenerator that creates batches of timeseries windows for input and target variables from a
         xarray.Dataset. The generator optionally takes into account ignoring NaN values.
@@ -26,11 +26,14 @@ class CustomTimeseriesGenerator(Sequence):
             n-days will be taken as input and the the streamflow for n + 1 will be taken as target.
         feature_vars: list
             List of variables that should be used as input features
-        target_vars: list
+        target_var: list
             List of variables that should be used as targets
         drop_na: bool
             Indicates whether NaN values for the target vars should be preserved for generating time win or not.
             Default: True
+        joined_features: bool
+            Indicates whether the timeseries batches should be prepared in a joined way, meaning input features are
+            valid for all basins. If False, input feature timeseries are basin indexed. Default: False
         input_shape: tuple
             Shape of the inputs to be used for generating time windows. If not specified, the input shape will be
             computed automatically from the given xarray.Dataset.
@@ -50,11 +53,11 @@ class CustomTimeseriesGenerator(Sequence):
         self.feature_vars = feature_vars
         self.target_var = target_var
         self.drop_na = drop_na
-        self.joined_output = joined_output
+        self.joined_features = joined_features
         self.input_shape = input_shape
-        self.idx_dict = self.__get_idx_df(drop_na, joined_output)
+        self.idx_dict = self.__get_idx_df(drop_na, joined_features)
         self.ds_inputs = self.xds[feature_vars].to_array()
-        if joined_output:
+        if joined_features:
             self.ds_targets = self.xds[[target_var]].to_array()
         else:
             self.ds_targets = self.xds[[target_var]].to_array()
@@ -92,7 +95,7 @@ class CustomTimeseriesGenerator(Sequence):
         else:
             shape = self._get_input_shape()
             inputs = np.empty(shape)
-        if self.joined_output:
+        if self.joined_features:
             targets = np.empty((0, len(self.xds.basin.values)))
         else:
             targets = np.empty((0, 1))
@@ -100,7 +103,7 @@ class CustomTimeseriesGenerator(Sequence):
         for index, row in df_batch.iterrows():
             start_date_idx = row.time_idx - self.timesteps
             end_date_idx = row.time_idx - self.offset + 1
-            if self.joined_output:
+            if self.joined_features:
                 forcings_values = self.ds_inputs[:, start_date_idx:end_date_idx, ...].values
                 forcings_values = np.moveaxis(forcings_values, 0, -1)
                 inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
