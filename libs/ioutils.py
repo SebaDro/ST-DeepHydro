@@ -41,7 +41,7 @@ def discover_single_file_for_basin(data_dir: str, basin: str) -> str:
     return files[0]
 
 
-def discover_files_for_basins(data_dir: str, basins: list) -> dict:
+def discover_files_for_basins(data_dir: str, basins: list) -> list:
     """
 
     Parameters
@@ -53,15 +53,44 @@ def discover_files_for_basins(data_dir: str, basins: list) -> dict:
 
     Returns
     -------
-    dict
-        Dict that holds the dataset path to each basin
+    list
+        List that holds the dataset path to each basin
 
     """
-    file_dict = {}
-    for basin in basins:
-        file = discover_single_file_for_basin(data_dir, basin)
-        file_dict[basin] = file
-    return file_dict
+    return [discover_single_file_for_basin(data_dir, b) for b in basins]
+
+
+def discover_daymet_files(root_data_dir: str, variables: list):
+    """
+    Discovers all Daymet NetCDF files from a root directory for given variables.
+
+    Folder structure and file naming must follow the following convention {root_dir}/{variable}/*_daymet_v4_daily_na_{variable}_*.nc.
+    E.g. for given variables [var1, var2] the method will discover within the directory {root_dir}/var1 all NetCDF files
+    with filename *_daymet_v4_daily_na_var1_*.nc and within the directory {root_dir}/var2 all NetCDF files with filename
+    *_daymet_v4_daily_na_var2_*.nc. Files and directories that do not follow these conventions will be ignored.
+
+    Parameters
+    ----------
+    root_data_dir: str
+        Root data dir
+    variables: list
+        List of variables that should be considered for file discovery
+
+    Returns
+    -------
+    List
+        List of NetCDF file paths
+
+    """
+    file_list = []
+    for variable in variables:
+        data_dir = os.path.join(root_data_dir, variable)
+        files = glob.glob(f"{data_dir}/*_daymet_v4_daily_na_{variable}_*.nc")
+        if not files:
+            logger.warning(f"No files found in path {data_dir} for variable {variable}.")
+        else:
+            file_list.extend(files)
+    return file_list
 
 
 def discover_single_camels_us_forcings_file(data_dir: str, forcings_type: str, basin: str):
@@ -259,10 +288,48 @@ def load_forcings_daymet_2d(path: str) -> xr.Dataset:
     Returns
     -------
     xarray.Dataset
-        Dataset hat contains two dimensional Daymet forcings data
+        Dataset hat contains 2-dimensional Daymet forcings data
 
     """
     with xr.open_dataset(path) as ds:
+        return ds
+
+
+def load_multiple_forcings_daymet_2d(file_paths: list) -> xr.Dataset:
+    """
+    Loads multiple Daymet forcings NetCDF files from a list of file paths as Dask arrays wrapped within a Dataset.
+
+    Parameters
+    ----------
+    file_paths: str
+        File paths to multiple Daymet NetCDF datasets
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset hat contains 2-dimensional Daymet forcings data
+
+    """
+    with xr.open_mfdataset(file_paths, engine='h5netcdf') as ds:
+        return ds
+
+
+def load_forcings_daymet_2d_from_zarr(store_dir: str) -> xr.Dataset:
+    """
+    Loads Daymet forcings from a Zarr store as Dask arrays wrapped within a Dataset.
+
+    Parameters
+    ----------
+    store_dir: str
+        Zarr store directory
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset hat contains 2-dimensional Daymet forcings data
+
+    """
+    with xr.open_zarr(store_dir) as ds:
         return ds
 
 
