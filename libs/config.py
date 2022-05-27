@@ -70,13 +70,18 @@ class DataConfig:
     Holds configuration parameters required for creating training, validation and test datasets from forcings and
     streamflow data.
     """
-    def __init__(self, forcings_cfg: DataTypeConfig, streamflow_cfg: DataTypeConfig, training_cfg: DatasetConfig,
-                 validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
+    def __init__(self, basins_file: str, forcings_cfg: DataTypeConfig, streamflow_cfg: DataTypeConfig,
+                 training_cfg: DatasetConfig, validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
+        self.__basins_file = basins_file
         self.__forcings_cfg = forcings_cfg
         self.__streamflow_cfg = streamflow_cfg
         self.__training_cfg = training_cfg
         self.__validation_cfg = validation_cfg
         self.__test_cfg = test_cfg
+
+    @property
+    def basins_file(self):
+        return self.__basins_file
 
     @property
     def forcings_cfg(self):
