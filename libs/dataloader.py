@@ -1,7 +1,5 @@
 import pandas as pd
 import xarray as xr
-import dask
-from typing import Union
 
 from libs import config
 from libs import dataset
@@ -10,18 +8,14 @@ from libs import ioutils
 
 class AbstractDatasetLoader:
 
-    def __init__(self, basins: list, data_dir: str, variables: list):
-        self.__basins = basins
+    def __init__(self, data_dir: str, variables: list, basins: list = None):
         self.__data_dir = data_dir
         self.__variables = variables
+        self.__basins = basins
 
     @classmethod
     def from_config(cls, data_cfg: config.DataTypeConfig, basins):
-        return cls(basins, data_cfg.data_dir, data_cfg.variables)
-
-    @property
-    def basins(self):
-        return self.__basins
+        return cls(data_cfg.data_dir, data_cfg.variables, basins)
 
     @property
     def data_dir(self):
@@ -31,18 +25,27 @@ class AbstractDatasetLoader:
     def variables(self):
         return self.__variables
 
-    def load_full_dataset(self, start_date: str, end_date: str, as_dask: bool = False) -> xr.Dataset:
+    @property
+    def basins(self):
+        return self.__basins
+
+    def load_full_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
         pass
 
     def load_single_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
         pass
 
+    def load_joined_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
+        pass
+
 
 class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
 
-    def __init__(self, basins: list, data_dir: str, variables: list, forcings_dir: str = None):
-        super().__init__(basins, data_dir, variables)
+    def __init__(self, data_dir: str, variables: list, basins: list = None, forcings_dir: str = None,
+                 as_dask: bool = False):
+        super().__init__(data_dir, variables, basins)
         self.__forcings_dir = forcings_dir
+        self.__as_dask = as_dask
 
     def load_single_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
         """
@@ -68,15 +71,15 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
         """
         return self._load_xarray_dataset(start_date, end_date, basin)
 
-    def load_full_dataset(self, start_date: str, end_date: str, as_dask: bool = False) -> xr.Dataset:
+    def load_full_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
         """
         Loads Camels-US streamflow timeseries data as either as xarray.Dataset for the specified start and end date.
         The method will load streamflow data for all basins that have been specified for instantiating this
         data loader.
 
-        Note, that streamflow will be normalized, which means it will be devided by the basin area and converted to
-        meters per day. For loading basin area information you have to instantiate this data loader by additionally
-        passing the forcings directory.
+        Note, that streamflow will be normalized if the data loader has been initialized with a given forcings directory.
+        This means streamflow will be devided by the basin area and converted to meters per day. For loading basin area
+        information you have to instantiate this data loader by additionally passing the forcings directory.
 
         Parameters
         ----------
@@ -96,13 +99,16 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
         """
         ds_list = []
         for basin in self.basins:
-            ds = self._load_xarray_dataset(start_date, end_date, basin, True)
-            if as_dask:
+            if self.__forcings_dir is None:
+                ds = self._load_xarray_dataset(start_date, end_date, basin, False)
+            else:
+                ds = self._load_xarray_dataset(start_date, end_date, basin, True)
+            if self.__as_dask:
                 ds = ds.chunk()
             ds_list.append(ds)
         ds_timeseries = xr.concat(ds_list, dim="basin")
 
-        if as_dask:
+        if self.__as_dask:
             ds_timeseries = ds_timeseries.chunk({"basin": len(ds_timeseries.basin)})
 
         return ds_timeseries
@@ -131,6 +137,10 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
 
 class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
 
+    def __init__(self, data_dir: str, variables: list, basins: list = None, as_dask: bool = False):
+        super().__init__(data_dir, variables, basins)
+        self.__as_dask = as_dask
+
     def load_single_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
         """
         Loads Camels-US forcings timeseries data as xarray.Dataset for a single basin and the specified start and end
@@ -155,7 +165,7 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
 
         return ds_timeseries
 
-    def load_full_dataset(self, start_date: str, end_date: str, as_dask: bool = False) -> xr.Dataset:
+    def load_full_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
         """
         Loads Camels-US forcings timeseries data as xarray.Dataset for the specified start and end date. The method will
         load forcings data for all basins that have been specified for instantiating this data loader.
@@ -179,12 +189,12 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
         ds_list = []
         for basin in self.basins:
             ds = self._load_xarray_dataset(start_date, end_date, basin)
-            if as_dask:
+            if self.__as_dask:
                 ds = ds.chunk()
             ds_list.append(ds)
         ds_timeseries = xr.concat(ds_list, dim="basin")
 
-        if as_dask:
+        if self.__as_dask:
             ds_timeseries = ds_timeseries.chunk({"basin": len(ds_timeseries.basin)})
 
         return ds_timeseries
@@ -206,29 +216,9 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
 
 class DaymetDataLoader(AbstractDatasetLoader):
 
-    def load_dataset(self, start_date: str, end_date: str, as_dask: bool = False, basin: str = None) -> xr.Dataset:
-        """
-        Loads raster-based Daymet forcings as xarray.Dataset. The xarray.Dataset is indexed by time, basin ID and
-        a spatial dimension by means of 'x' and 'y' coordinates.
-
-        Parameters
-        ----------
-        start_date: str
-            String that represents a date. It will be used as start date for subsetting the timeseries datasets.
-        end_date: str
-            String that represents a date. It will be used as end date for subsetting the timeseries datasets.
-        as_dask: bool:
-            Daymet data loader does not yet support loading raster datasets as Dask Array
-        basin: str
-            ID of the basin to load forcings data for.
-
-        Returns
-        -------
-        xarray.Dataset
-            A xarray.Dataset that holds forcing and streamflow variables.
-
-        """
-        return self.load_single_dataset(start_date, end_date, basin)
+    def __init__(self, data_dir: str, variables: list, basins: list = None, from_zarr: bool = False):
+        super().__init__(data_dir, variables, basins)
+        self.__from_zarr = from_zarr
 
     def load_single_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
         """
@@ -254,12 +244,29 @@ class DaymetDataLoader(AbstractDatasetLoader):
 
         return ds_timeseries
 
-    def _load_xarray_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
-        forcings_path = ioutils.discover_single_file_for_basin(self.data_dir, basin)
-        ds_forcings = ioutils.load_forcings_daymet_2d(forcings_path)
+    def load_joined_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
+        if self.__from_zarr:
+            ds_forcings = ioutils.load_forcings_daymet_2d_from_zarr(self.data_dir)
+        else:
+            daymet_files = ioutils.discover_daymet_files(self.data_dir, self.variables)
+            ds_forcings = ioutils.load_multiple_forcings_daymet_2d(daymet_files)
         ds_forcings = ds_forcings.sel(time=slice(start_date, end_date))[self.variables]
-        ds_forcings = ds_forcings.assign_coords({"basin": basin})
-        ds_forcings = ds_forcings.expand_dims("basin")
+        ds_forcings["time"] = ds_forcings.indexes["time"].normalize()
+        return ds_forcings
+
+    def _discover_and_load_xarray_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
+        forcings_path = ioutils.discover_single_file_for_basin(self.data_dir, basin)
+        return self._load_xarray_dataset(forcings_path, start_date, end_date)
+
+    def _load_xarray_dataset(self, path: str, start_date: str, end_date: str, basin: str = None) -> xr.Dataset:
+        if self.__from_zarr:
+            ds_forcings = ioutils.load_forcings_daymet_2d_from_zarr(path)
+        else:
+            ds_forcings = ioutils.load_forcings_daymet_2d(path)
+        ds_forcings = ds_forcings.sel(time=slice(start_date, end_date))[self.variables]
+        if basin is not None:
+            ds_forcings = ds_forcings.assign_coords({"basin": basin})
+            ds_forcings = ds_forcings.expand_dims("basin")
         ds_forcings["time"] = ds_forcings.indexes["time"].normalize()
 
         return ds_forcings
@@ -291,7 +298,7 @@ class HydroDataLoader:
     @classmethod
     def from_config(cls, data_cfg: config.DataConfig):
         """
-        Creates a BasinDataLoader instance from configurations.
+        Creates a HydroDataLoader instance from configurations.
 
         Parameters
         ----------
@@ -305,12 +312,13 @@ class HydroDataLoader:
             A HydroDataLoader instance
 
         """
-        forcings_dataloader = forcings_factory(data_cfg.forcings_cfg.data_type, data_cfg.basins,
-                                               data_cfg.forcings_cfg.data_dir, data_cfg.forcings_cfg.variables)
-        streamflow_dataloader = streamflow_factory(data_cfg.streamflow_cfg.data_type, data_cfg.basins,
-                                                   data_cfg.streamflow_cfg.data_dir, data_cfg.streamflow_cfg.variables)
-        return cls(forcings_dataloader, streamflow_dataloader,
-                   data_cfg.forcings_cfg.variables, data_cfg.streamflow_cfg.variables)
+        with open(data_cfg.basins_file, 'r') as file:
+            basins = [line.strip() for line in file.readlines()]
+        forcings_dl = forcings_factory(data_cfg.forcings_cfg.data_type, basins, data_cfg.forcings_cfg.data_dir,
+                                       data_cfg.forcings_cfg.variables)
+        streamflow_dl = streamflow_factory(data_cfg.streamflow_cfg.data_type, basins, data_cfg.streamflow_cfg.data_dir,
+                                           data_cfg.streamflow_cfg.variables)
+        return cls(forcings_dl, streamflow_dl, data_cfg.forcings_cfg.variables, data_cfg.streamflow_cfg.variables)
 
     @property
     def forcings_variables(self):
@@ -328,9 +336,17 @@ class HydroDataLoader:
         return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
                                     start_date, end_date)
 
-    def load_full_dataset(self, start_date: str, end_date: str, as_dask: bool = False):
-        ds_forcings = self.__forcings_dataloader.load_full_dataset(start_date, end_date, as_dask)
-        ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date, as_dask)
+    def load_full_dataset(self, start_date: str, end_date: str):
+        ds_forcings = self.__forcings_dataloader.load_full_dataset(start_date, end_date)
+        ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
+        ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
+
+        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
+                                    start_date, end_date)
+
+    def load_joined_dataset(self, start_date: str, end_date: str):
+        ds_forcings = self.__forcings_dataloader.load_joined_dataset(start_date, end_date)
+        ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
 
         return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
@@ -350,14 +366,13 @@ def normalize_streamflow(streamflow, area: float):
 
 def forcings_factory(forcings_type: str, basins: list, forcings_dir: str, forcings_vars: list) -> AbstractDatasetLoader:
     if forcings_type == "camels-us":
-        return CamelsUsForcingsDataLoader(basins, forcings_dir, forcings_vars)
+        return CamelsUsForcingsDataLoader(forcings_dir, forcings_vars, basins)
     if forcings_type == "daymet":
-        return DaymetDataLoader(basins, forcings_dir, forcings_vars)
+        return DaymetDataLoader(forcings_dir, forcings_vars, basins)
     raise ValueError("No forcings data loader exists for the specified dataset type '{}.".format(forcings_type))
 
 
-def streamflow_factory(streamflow_type: str, basins: list, streamflow_dir: str,
-                       streamflow_vars: list) -> AbstractDatasetLoader:
+def streamflow_factory(streamflow_type: str, basins: list, streamflow_dir: str, streamflow_vars: list) -> AbstractDatasetLoader:
     if streamflow_type == "camels-us":
-        return CamelsUsStreamflowDataLoader(basins, streamflow_dir, streamflow_vars)
+        return CamelsUsStreamflowDataLoader(streamflow_dir, streamflow_vars, basins)
     raise ValueError("No streamflow data loader exists for the specified dataset type '{}.".format(streamflow_type))
