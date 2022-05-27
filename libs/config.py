@@ -70,18 +70,13 @@ class DataConfig:
     Holds configuration parameters required for creating training, validation and test datasets from forcings and
     streamflow data.
     """
-    def __init__(self, basins: list, forcings_cfg: DataTypeConfig, streamflow_cfg: DataTypeConfig,
-                 training_cfg: DatasetConfig, validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
-        self.__basins = basins
+    def __init__(self, forcings_cfg: DataTypeConfig, streamflow_cfg: DataTypeConfig, training_cfg: DatasetConfig,
+                 validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
         self.__forcings_cfg = forcings_cfg
         self.__streamflow_cfg = streamflow_cfg
         self.__training_cfg = training_cfg
         self.__validation_cfg = validation_cfg
         self.__test_cfg = test_cfg
-
-    @property
-    def basins(self):
-        return self.__basins
 
     @property
     def forcings_cfg(self):
@@ -106,7 +101,7 @@ class DataConfig:
 
 class ModelConfig:
     def __init__(self, model_type: str, timesteps: int, offset: int, loss: list, metrics: list, optimizer: str,
-                 epochs: int, batch_size: int, params: dict):
+                 epochs: int, batch_size: int, multi_output: bool, params: dict):
         self.__model_type = model_type
         self.__timesteps = timesteps
         self.__offset = offset
@@ -115,6 +110,7 @@ class ModelConfig:
         self.__optimizer = optimizer
         self.__epochs = epochs
         self.__batch_size = batch_size
+        self.__multi_output = multi_output
         self.__params = params
 
     @property
@@ -150,6 +146,10 @@ class ModelConfig:
         return self.__batch_size
 
     @property
+    def multi_output(self):
+        return self.__multi_output
+
+    @property
     def params(self):
         return self.__params
 
@@ -159,6 +159,25 @@ class Config:
         self.__general_config = general_config
         self.__data_config = data_config
         self.__model_config = model_config
+
+    @classmethod
+    def from_dict(cls, cfg_dict: dict):
+        """
+        Creates a Config instance from a dictionary.
+
+        Parameters
+        ----------
+        cfg_dict: dict
+            Dictionary containing config parameters
+
+        Returns
+        -------
+        Config
+            Instantiates a Config object
+
+        """
+        return cls(create_general_config(cfg_dict["general"]), create_data_config(cfg_dict["data"]),
+                   create_model_config(cfg_dict["model"]))
 
     @property
     def general_config(self):
@@ -217,7 +236,7 @@ def create_dataype_config(cfg: dict) -> DataTypeConfig:
 
     Returns
     -------
-    DatasetConfig
+    DataTypeConfig
         Object containing config parameters that define a certain data type which can be used for reading it from
         a file
 
@@ -240,10 +259,7 @@ def create_data_config(cfg: dict) -> DataConfig:
         Object containing config parameters controlling the reading of streamflow and forcing datasets
 
     """
-    basins = None
-    if "basins" in cfg:
-        basins = cfg["basins"]
-    return DataConfig(basins, create_dataype_config(cfg["forcings"]), create_dataype_config(cfg["streamflow"]),
+    return DataConfig(create_dataype_config(cfg["forcings"]), create_dataype_config(cfg["streamflow"]),
                       create_dataset_config(cfg["training"]), create_dataset_config(cfg["validation"]),
                       create_dataset_config(cfg["test"]))
 
