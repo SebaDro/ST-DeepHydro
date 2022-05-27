@@ -156,4 +156,4 @@ class DefaultDatasetProcessor(AbstractProcessor):
         return ds
 
     def __fit_scaling_params(self, ds: dataset.HydroDataset):
-        self.scaling_params = (ds.timeseries.min(), ds.timeseries.max())
+        self.scaling_params = (ds.timeseries.min(["time", "y", "x"]), ds.timeseries.max(["time", "y", "x"]))
