@@ -28,7 +28,7 @@ class AbstractModel:
     def history(self):
         return self.__history
 
-    def build(self, input_shape: tuple):
+    def build(self, input_shape: tuple, output_size: int = None):
         """
         Builds the model architecture in accordance to the config.ModelConfig that has been passed for model
         instantiation and a given input_shape.
@@ -41,12 +41,14 @@ class AbstractModel:
 
             One-dimensional: (timesteps, variables)
             Two-dimensional: (timesteps, x, y, variables)
+        output_size: int
+            Size of the model outputs (optional). If not set, model output will be set to 1 per default.
 
         """
         param_tuple = self._get_and_validate_params(self._config.params)
-        self.__model = self._build_model(input_shape, param_tuple)
+        self.__model = self._build_model(input_shape, param_tuple, output_size)
 
-    def _build_model(self, input_shape: tuple, params: tuple):
+    def _build_model(self, input_shape: tuple, params: tuple, output_size):
         raise NotImplementedError
 
     def _get_and_validate_params(self, params: dict):
@@ -203,14 +205,19 @@ class AbstractModel:
         self.model.save(storage_path)
 
     def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
-        return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                   self._config.offset, ds.feature_cols, ds.target_cols[0], remove_nan,
-                                                   False)
+        if self._config.multi_output:
+            return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
+                                                       self._config.offset, ds.feature_cols, ds.target_cols[0],
+                                                       remove_nan, True)
+        else:
+            return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
+                                                       self._config.offset, ds.feature_cols, ds.target_cols[0],
+                                                       remove_nan, False)
 
 
 class LstmModel(AbstractModel):
 
-    def _build_model(self, input_shape: tuple, params: tuple):
+    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None):
         hidden_layers, units, dropout = params
 
         model = tf.keras.Sequential()
@@ -218,7 +225,10 @@ class LstmModel(AbstractModel):
         for i in range(0, hidden_layers - 1):
             model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
         model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], dropout=dropout[hidden_layers - 1], use_bias=True))
-        model.add(tf.keras.layers.Dense(units=1))
+        if output_size is None:
+            model.add(tf.keras.layers.Dense(units=1))
+        else:
+            model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
     def _get_and_validate_params(self, params: dict):
@@ -240,7 +250,7 @@ class LstmModel(AbstractModel):
 
 class CnnLstmModel(AbstractModel):
 
-    def _build_model(self, input_shape: tuple, params: tuple):
+    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None):
         hidden_layers, units, dropout = params
 
         model = tf.keras.models.Sequential([
@@ -254,7 +264,10 @@ class CnnLstmModel(AbstractModel):
         for i in range(0, hidden_layers - 1):
             model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
         model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], use_bias=True))
-        model.add(tf.keras.layers.Dense(units=1))
+        if output_size is None:
+            model.add(tf.keras.layers.Dense(units=1))
+        else:
+            model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
     def _get_and_validate_params(self, params: dict):
@@ -276,7 +289,7 @@ class CnnLstmModel(AbstractModel):
 
 class ConvLstmModel(AbstractModel):
 
-    def _build_model(self, input_shape: tuple, params: dict):
+    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
         model = tf.keras.models.Sequential([
             tf.keras.Input(shape=input_shape),
             tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", return_sequences=True),
@@ -285,8 +298,11 @@ class ConvLstmModel(AbstractModel):
             # tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
             tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu"),
             tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(1)
         ])
+        if output_size is None:
+            model.add(tf.keras.layers.Dense(units=1))
+        else:
+            model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
     def _get_and_validate_params(self, params: dict):
