@@ -148,7 +148,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         """
         if self.scaling_params is None:
-            logging.warning("Processor has not been fit to a dataset before. Thus, it will be fitted to the provided "
+            logger.warning("Processor has not been fit to a dataset before. Thus, it will be fitted to the provided "
                             "dataset.")
             self.__fit_scaling_params(ds)
         ds = copy.copy(ds)
