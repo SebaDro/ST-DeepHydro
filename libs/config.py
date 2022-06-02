@@ -264,9 +264,9 @@ def create_data_config(cfg: dict) -> DataConfig:
         Object containing config parameters controlling the reading of streamflow and forcing datasets
 
     """
-    return DataConfig(create_dataype_config(cfg["forcings"]), create_dataype_config(cfg["streamflow"]),
-                      create_dataset_config(cfg["training"]), create_dataset_config(cfg["validation"]),
-                      create_dataset_config(cfg["test"]))
+    return DataConfig(cfg["basinsFile"], create_dataype_config(cfg["forcings"]),
+                      create_dataype_config(cfg["streamflow"]), create_dataset_config(cfg["training"]),
+                      create_dataset_config(cfg["validation"]), create_dataset_config(cfg["test"]))
 
 
 def create_model_config(cfg: dict) -> ModelConfig:
@@ -285,7 +285,7 @@ def create_model_config(cfg: dict) -> ModelConfig:
 
     """
     return ModelConfig(cfg["type"], cfg["timesteps"], cfg["offset"], cfg["loss"], cfg["metrics"],
-                       cfg["optimizer"], cfg["epochs"], cfg["batchSize"], cfg["params"])
+                       cfg["optimizer"], cfg["epochs"], cfg["batchSize"], cfg["multiOutput"], cfg["params"])
 
 
 def create_config(cfg: dict) -> Config:
