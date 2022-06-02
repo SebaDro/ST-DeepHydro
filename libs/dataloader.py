@@ -248,6 +248,30 @@ class DaymetDataLoader(AbstractDatasetLoader):
         return ds_timeseries
 
     def load_joined_dataset(self, start_date: str, end_date: str) -> xr.Dataset:
+        """
+        Loads raster-based Daymet forcings from the data_dir for the specified start and end date as a joined xarray.Dataset.
+        If from_zarr is set to be true, it is assumed that data_dir points to a Zarr store and Daymet forcings will be
+        loaded as Dask Array. Otherwise, all single NetCDF forcings files will be discovered from data_dir and loaded
+        as Dask Array.
+
+        The xarray.Dataset is indexed by time, and a spatial dimension by means of 'x' and 'y' coordinates.
+
+        The dataset is meant to be valid for multiple basins e.g., if streamflow should be predicted for multiple
+        basins, the joined Daymet forcings dataset covers all basins.
+
+        Parameters
+        ----------
+        start_date: str
+            String that represents a date. It will be used as start date for subsetting the timeseries datasets.
+        end_date: str
+            String that represents a date. It will be used as end date for subsetting the timeseries datasets.
+
+        Returns
+        -------
+        xarray.Dataset
+            A xarray.Dataset that holds forcing and streamflow variables.
+
+        """
         if self.__from_zarr:
             ds_forcings = ioutils.load_forcings_daymet_2d_from_zarr(self.data_dir)
         else:
@@ -339,6 +363,27 @@ class HydroDataLoader:
         return self.__streamflow_variable
 
     def load_single_dataset(self, start_date: str, end_date: str, basin: str):
+        """
+        Uses the forcings and streamflow DatasetsLoader to load a single timeseries dataset as xarray.Dataset which
+        contains merged forcings and streamflow data.
+
+        The resulting xarray.Dataset will be wrapped by a dataset.HydroDataset.
+
+        Parameters
+        ----------
+        start_date: str
+            String that represents a date. It will be used as start date for subsetting the timeseries datasets.
+        end_date: str
+            String that represents a date. It will be used as end date for subsetting the timeseries datasets.
+        basin: str
+            Basin ID
+
+        Returns
+        -------
+        dataset.HydroDataset
+            Dataset which wraps forcings and streamflow timeseries data
+
+        """
         ds_forcings = self.__forcings_dataloader.load_single_dataset(start_date, end_date, basin)
         ds_streamflow = self.__streamflow_dataloader.load_single_dataset(start_date, end_date, basin)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
@@ -347,6 +392,26 @@ class HydroDataLoader:
                                     start_date, end_date)
 
     def load_full_dataset(self, start_date: str, end_date: str):
+        """
+        Uses the forcings and streamflow DataLoaders to load forcings and streamflow for the specified start and
+        end date as a joined xarray.Dataset. The method will load forcings and streamflow data for all basins that have
+        been specified for instantiating the data loaders.
+
+        The resulting xarray.Dataset will be wrapped by a dataset.HydroDataset.
+
+        Parameters
+        ----------
+        start_date: str
+            String that represents a date. It will be used as start date for subsetting the timeseries datasets.
+        end_date: str
+            String that represents a date. It will be used as end date for subsetting the timeseries datasets.
+
+        Returns
+        -------
+        dataset.HydroDataset
+            Dataset which wraps forcings and streamflow timeseries data
+
+        """
         ds_forcings = self.__forcings_dataloader.load_full_dataset(start_date, end_date)
         ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
@@ -355,6 +420,33 @@ class HydroDataLoader:
                                     start_date, end_date)
 
     def load_joined_dataset(self, start_date: str, end_date: str):
+        """
+        Uses the forcings and streamflow DataLoaders to load forcings and streamflow for the specified
+        start and end date as a joined xarray.Dataset. Forcings are loaded as a joined xarray.Datasets and streamflow as
+        full xarray.Dataset and both merged.
+
+        The forcings xarray.Dataset is indexed by time, and a spatial dimension by means of 'x' and 'y' coordinates.
+        The streamflow xarray.Dataset is indexed by time, basin and a spatial dimension by means of 'x' and 'y'
+        coordinates.
+
+        The dataset is meant to be valid for multiple basins e.g., if streamflow should be predicted for multiple basins,
+        the joined Daymet forcings dataset covers all basins.
+
+        The resulting xarray.Dataset will be wrapped by a dataset.HydroDataset.
+
+        Parameters
+        ----------
+        start_date: str
+            String that represents a date. It will be used as start date for subsetting the timeseries datasets.
+        end_date: str
+            String that represents a date. It will be used as end date for subsetting the timeseries datasets.
+
+        Returns
+        -------
+        dataset.HydroDataset
+            Dataset which wraps forcings and streamflow timeseries data
+
+        """
         ds_forcings = self.__forcings_dataloader.load_joined_dataset(start_date, end_date)
         ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")

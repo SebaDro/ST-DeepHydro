@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_data_preparation(cfg: config.Config, data_loader: dataloader.HydroDataLoader,
-                     processor: processing.AbstractProcessor, basin: str):
+                         processor: processing.AbstractProcessor, basin: str):
     logger.info(f"Load '{cfg.data_config.forcings_cfg.data_type}' forcings and "
                 f"'{cfg.data_config.streamflow_cfg.data_type}' streamflow data.")
     logger.debug(f"Split datasets: training start date {cfg.data_config.training_cfg.start_date}, "
