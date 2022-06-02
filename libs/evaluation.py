@@ -99,7 +99,8 @@ class Evaluation:
         else:
             return ds_res
 
-    def save(self, out_dir: str, pref: str = None):
+    def save(self, out_dir: str, pref: str = None) -> str:
         name = "prediction.nc" if pref is None else f"{pref}_prediction.nc"
         out_path = os.path.join(out_dir, name)
         self.ds_results.to_netcdf(out_path)
+        return out_path
