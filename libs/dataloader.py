@@ -1,9 +1,12 @@
+import logging
 import pandas as pd
 import xarray as xr
 
 from libs import config
 from libs import dataset
 from libs import ioutils
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractDatasetLoader:
@@ -274,7 +277,7 @@ class DaymetDataLoader(AbstractDatasetLoader):
 
 class HydroDataLoader:
     def __init__(self, forcings_data_loader: AbstractDatasetLoader, streamflow_data_loader: AbstractDatasetLoader,
-                 forcings_vars: list, streamflow_vars: list):
+                 forcings_vars: list, streamflow_var: str):
         """
         Default initializer for a data loader instance which loads and combines forcings and streamflow timeseries data
         for basins.
@@ -287,18 +290,21 @@ class HydroDataLoader:
             Instance for loading streamflow timeseries data as xarray.Dataset
         forcings_vars: list
             List of forcings variable names. The variables will be used for subsetting the forcings dataset.
-        streamflow_vars: list
-            List of streamflow variable names. The variables will be used for subsetting the streamflow dataset.
+        streamflow_var: str
+            Streamflow variable name. The variable will be used for subsetting the streamflow dataset.
         """
         self.__forcings_dataloader = forcings_data_loader
         self.__streamflow_dataloader = streamflow_data_loader
         self.__forcings_variables = forcings_vars
-        self.__streamflow_variables = streamflow_vars
+        self.__streamflow_variable = streamflow_var
 
     @classmethod
     def from_config(cls, data_cfg: config.DataConfig):
         """
         Creates a HydroDataLoader instance from configurations.
+
+        Note, that although the configuration file may contain a list of streamflow variables, the HydroDataLoader only
+        support a single streamflow variable. Thus, only the first variable of the list will be considered.
 
         Parameters
         ----------
@@ -318,22 +324,26 @@ class HydroDataLoader:
                                        data_cfg.forcings_cfg.variables)
         streamflow_dl = streamflow_factory(data_cfg.streamflow_cfg.data_type, basins, data_cfg.streamflow_cfg.data_dir,
                                            data_cfg.streamflow_cfg.variables)
-        return cls(forcings_dl, streamflow_dl, data_cfg.forcings_cfg.variables, data_cfg.streamflow_cfg.variables)
+        if len(data_cfg.streamflow_cfg.variables) > 0:
+            logger.warning(f"Configuration contains {len(data_cfg.streamflow_cfg.variables)} streamflow variables,"
+                           f" but only one is supported for training. Therefore, only the first variable"
+                           f" '{data_cfg.streamflow_cfg.variables[0]}' will be considered.")
+        return cls(forcings_dl, streamflow_dl, data_cfg.forcings_cfg.variables, data_cfg.streamflow_cfg.variables[0])
 
     @property
     def forcings_variables(self):
         return self.__forcings_variables
 
     @property
-    def streamflow_variables(self):
-        return self.__streamflow_variables
+    def streamflow_variable(self):
+        return self.__streamflow_variable
 
     def load_single_dataset(self, start_date: str, end_date: str, basin: str):
         ds_forcings = self.__forcings_dataloader.load_single_dataset(start_date, end_date, basin)
         ds_streamflow = self.__streamflow_dataloader.load_single_dataset(start_date, end_date, basin)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
 
-        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
+        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variable,
                                     start_date, end_date)
 
     def load_full_dataset(self, start_date: str, end_date: str):
@@ -341,7 +351,7 @@ class HydroDataLoader:
         ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
 
-        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
+        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variable,
                                     start_date, end_date)
 
     def load_joined_dataset(self, start_date: str, end_date: str):
@@ -349,7 +359,7 @@ class HydroDataLoader:
         ds_streamflow = self.__streamflow_dataloader.load_full_dataset(start_date, end_date)
         ds_timeseries = xr.merge([ds_forcings, ds_streamflow], join="left")
 
-        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variables,
+        return dataset.HydroDataset(ds_timeseries, self.forcings_variables, self.streamflow_variable,
                                     start_date, end_date)
 
 

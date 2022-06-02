@@ -179,7 +179,7 @@ class AbstractModel:
         res_ds = ds.timeseries.sel(time=slice(target_start_date, np.datetime64(ds.end_date)))
 
         res_dict = {}
-        for i, param in enumerate(ds.target_cols):
+        for i, param in enumerate([ds.target_col]):
             if remove_nan:
                 non_nan_flags = np.invert(np.isnan(res_ds.sel(basin=basin)[param]))
                 res_times = res_ds.time[non_nan_flags]
@@ -207,11 +207,11 @@ class AbstractModel:
     def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
         if self._config.multi_output:
             return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, ds.feature_cols, ds.target_cols[0],
+                                                       self._config.offset, ds.feature_cols, ds.target_col,
                                                        remove_nan, True)
         else:
             return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, ds.feature_cols, ds.target_cols[0],
+                                                       self._config.offset, ds.feature_cols, ds.target_col,
                                                        remove_nan, False)
 
 

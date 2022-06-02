@@ -20,19 +20,19 @@ class HydroDataset:
         the timeseries datasets for each basin.
     feature_variables: list
         List of names that represent the feature variables (e.g. 'temp', 'prec') within the xarray.Dataset
-    target_variables
-        List of names that represent the target variables (e.g. `streamflow`) within the xarray.Dataset.
+    target_variable
+        Name that represent the target variables (e.g. `streamflow`) within the xarray.Dataset.
     start_date:
         Start date of the timeseries
     end_date
         End date of the timeseries
     """
 
-    def __init__(self, timeseries: xr.Dataset, feature_variables: list, target_variables: list,
+    def __init__(self, timeseries: xr.Dataset, feature_variables: list, target_variable: str,
                  start_date: str = None, end_date: str = None):
         self.__timeseries = timeseries
         self.__feature_cols = feature_variables
-        self.__target_cols = target_variables
+        self.__target_col = target_variable
         self.__start_date = start_date
         self.__end_date = end_date
 
@@ -49,8 +49,8 @@ class HydroDataset:
         return self.__feature_cols
 
     @property
-    def target_cols(self):
-        return self.__target_cols
+    def target_col(self):
+        return self.__target_col
 
     @property
     def start_date(self):
