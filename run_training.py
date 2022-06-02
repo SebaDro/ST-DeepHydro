@@ -1,22 +1,33 @@
-import sys
+import argparse
 import logging
 import logging.config
-from libs import config
-from libs import ioutils
-from libs import training
 import yaml
+
+from libs import config
+from libs import training
 
 with open("./config/logging.yml", "r") as stream:
     log_config = yaml.load(stream, Loader=yaml.FullLoader)
     logging.config.dictConfig(log_config)
 
 
-def main():
-    logging.info("Start run_training.py")
-    if len(sys.argv) != 2:
-        raise ValueError("Missing argument for config file path!")
-    config_path = sys.argv[1]
+def read_args():
+    parser = argparse.ArgumentParser(description='Download some Daymet files.')
+    parser.add_argument('config', type=str, help="Path to a config file that controls the download process")
+    parser.add_argument("--dryrun", action="store_true", help="If set, training will be performed in a dry run, which "
+                                                              "means no outputs and results will be stored. This "
+                                                              "includes training progress, model states and evaluation "
+                                                              "results.")
+    args = parser.parse_args()
+    return args
 
+
+def main():
+    args = read_args()
+    config_path = args.config
+    dry_run = args.dryrun
+
+    logging.info("Start run_training.py" if not dry_run else "Start run_training.py in dry run mode.")
     logging.info(f"Read config from path '{config_path}'")
 
     cfg_dict = config.read_config(config_path)
@@ -26,7 +37,7 @@ def main():
         try:
             logging.debug(f"Config: '{cfg_dict}'")
             cfg = config.Config.from_dict(cfg_dict)
-            training.run_training(cfg)
+            training.run_training(cfg, dry_run)
 
             logging.info("Successfully finished run_training.py")
         except config.ConfigError:
