@@ -291,7 +291,7 @@ def load_forcings_daymet_2d(path: str) -> xr.Dataset:
         Dataset hat contains 2-dimensional Daymet forcings data
 
     """
-    with xr.open_dataset(path) as ds:
+    with xr.open_dataset(path, engine="h5netcdf") as ds:
         return ds
 
 
@@ -310,7 +310,7 @@ def load_multiple_forcings_daymet_2d(file_paths: list) -> xr.Dataset:
         Dataset hat contains 2-dimensional Daymet forcings data
 
     """
-    with xr.open_mfdataset(file_paths, engine='h5netcdf') as ds:
+    with xr.open_mfdataset(file_paths, engine="h5netcdf") as ds:
         return ds
 
 
