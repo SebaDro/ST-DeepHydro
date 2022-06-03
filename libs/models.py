@@ -275,6 +275,11 @@ class CnnLstmModel(AbstractModel):
             lstm_params = params["lstm"]
             hidden_layers = lstm_params["hiddenLayers"]
             units = lstm_params["units"]
+            if not isinstance(hidden_layers, int):
+                raise config.ConfigError(
+                    f"Wrong type of 'hidden_layers' parameter: {type(hidden_layers)}. Expected: 'int'")
+            if hidden_layers < 0:
+                raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
             if len(units) != hidden_layers:
                 raise config.ConfigError(
                     f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")

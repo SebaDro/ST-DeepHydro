@@ -181,8 +181,11 @@ class Config:
             Instantiates a Config object
 
         """
-        return cls(create_general_config(cfg_dict["general"]), create_data_config(cfg_dict["data"]),
-                   create_model_config(cfg_dict["model"]))
+        try:
+            return cls(create_general_config(cfg_dict["general"]), create_data_config(cfg_dict["data"]),
+                       create_model_config(cfg_dict["model"]))
+        except KeyError as e:
+            raise ConfigError("Could not create configuration due to invalid config parameters.") from e
 
     @property
     def general_config(self):
@@ -325,11 +328,15 @@ def read_config(path: str) -> dict:
         Dictionary containing config parameters
 
     """
-    with open(path, 'r') as stream:
-        try:
+
+    try:
+        with open(path, 'r') as stream:
             config = yaml.safe_load(stream)
             return config
-        except yaml.YAMLError as ex:
-            print("Error reading config file {}".format(ex))
-        except KeyError as ex:
-            print("Missing config parameter: {}".format(ex))
+    except yaml.YAMLError as e:
+        raise ConfigError("Could not read configuration due to invalid formating.") from e
+    except KeyError as e:
+        raise ConfigError("Could not read configuration due to missing config parameters.") from e
+    except IOError as e:
+        raise ConfigError("Error while trying toe read configuration file.") from e
+

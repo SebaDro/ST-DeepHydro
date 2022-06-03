@@ -30,18 +30,18 @@ def main():
     logging.info("Start run_training.py" if not dry_run else "Start run_training.py in dry run mode.")
     logging.info(f"Read config from path '{config_path}'")
 
-    cfg_dict = config.read_config(config_path)
-    if cfg_dict is None:
-        logging.error("Configuration could not be loaded or is invalid. Training will be stopped.")
-    else:
-        try:
+    try:
+        cfg_dict = config.read_config(config_path)
+        if cfg_dict is None:
+            logging.error("Configuration could not be loaded or is invalid. Training will be stopped.")
+        else:
             logging.debug(f"Config: '{cfg_dict}'")
             cfg = config.Config.from_dict(cfg_dict)
             training.run_training(cfg, dry_run)
 
-            logging.info("Successfully finished run_training.py")
-        except config.ConfigError:
-            logging.exception("Could not create configuration. Training will be stopped.")
+        logging.info("Finished run_training.py")
+    except config.ConfigError:
+        logging.exception("Could not create configuration. Training will be stopped.")
 
 
 if __name__ == "__main__":
