@@ -221,7 +221,7 @@ class LstmModel(AbstractModel):
         hidden_layers, units, dropout = params
 
         model = tf.keras.Sequential()
-        model.add(tf.keras.Input(shape=input_shape))
+        model.add(tf.keras.layers.InputLayer(input_shape=input_shape))
         for i in range(0, hidden_layers - 1):
             model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
         model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], dropout=dropout[hidden_layers - 1], use_bias=True))
@@ -254,13 +254,16 @@ class CnnLstmModel(AbstractModel):
         hidden_layers, units, dropout = params
 
         model = tf.keras.models.Sequential([
-            tf.keras.Input(shape=input_shape),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu")),
+            tf.keras.layers.InputLayer(input_shape=input_shape),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (1, 1), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu")),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()),
         ])
+
         for i in range(0, hidden_layers - 1):
             model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
         model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], use_bias=True))
@@ -296,13 +299,15 @@ class ConvLstmModel(AbstractModel):
 
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
         model = tf.keras.models.Sequential([
-            tf.keras.Input(shape=input_shape),
-            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", return_sequences=True),
+            tf.keras.layers.InputLayer(input_shape=input_shape),
+            tf.keras.layers.ConvLSTM2D(32, (1, 1), activation="relu", padding="same", return_sequences=True),
+            tf.keras.layers.ConvLSTM2D(16, (3, 3), activation="relu", padding="same", return_sequences=True),
+            tf.keras.layers.ConvLSTM2D(16, (3, 3), activation="relu", padding="same", return_sequences=True),
             tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
-            # tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", return_sequences=True),
-            # tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
-            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu"),
-            tf.keras.layers.Flatten(),
+            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=True),
+            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=False),
+            tf.keras.layers.GlobalMaxPooling2D(),
+            tf.keras.layers.Dense(1)
         ])
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
