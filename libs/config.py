@@ -106,7 +106,7 @@ class DataConfig:
 
 class ModelConfig:
     def __init__(self, model_type: str, timesteps: int, offset: int, loss: list, metrics: list, optimizer: str,
-                 epochs: int, batch_size: int, multi_output: bool, params: dict):
+                 epochs: int, batch_size: int, multi_output: bool, params: dict = None):
         self.__model_type = model_type
         self.__timesteps = timesteps
         self.__offset = offset

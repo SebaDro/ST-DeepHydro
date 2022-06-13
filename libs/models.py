@@ -306,8 +306,30 @@ class ConvLstmModel(AbstractModel):
             tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
             tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=True),
             tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=False),
-            tf.keras.layers.GlobalMaxPooling2D(),
-            tf.keras.layers.Dense(1)
+            tf.keras.layers.GlobalMaxPooling2D()
+        ])
+        if output_size is None:
+            model.add(tf.keras.layers.Dense(units=1))
+        else:
+            model.add(tf.keras.layers.Dense(units=output_size))
+        return model
+
+    def _get_and_validate_params(self, params: dict):
+        return None
+
+
+class Conv3DModel(AbstractModel):
+
+    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.InputLayer(input_shape=input_shape),
+            tf.keras.layers.Conv3D(32, (1, 1, 1), activation="relu", padding="same"),
+            tf.keras.layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.MaxPooling3D((1, 2, 2)),
+            tf.keras.layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.GlobalMaxPooling3D()
         ])
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
@@ -326,6 +348,8 @@ def factory(cfg: config.ModelConfig) -> AbstractModel:
         return CnnLstmModel(cfg)
     if cfg.model_type == "convlstm":
         return ConvLstmModel(cfg)
+    if cfg.model_type == "conv3d":
+        return Conv3DModel(cfg)
     raise ValueError("No model for the given type '{}' available.".format(cfg.model_type))
 
 
