@@ -1,8 +1,5 @@
 data:
-  basins:
-    - "1000"
-    - "2000"
-    - "3000"
+  basinsFile: "./data/basins-test.txt"
   streamflow:
     dir: "./data/streamflow"
     type: "camels-us"
@@ -35,6 +32,7 @@ model:
   optimizer: "Adam"
   epochs: 2
   batchSize: 32
+  multiOutput: false
   params:
     hiddenLayers: 2
     units:

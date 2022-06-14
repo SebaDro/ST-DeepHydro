@@ -23,7 +23,7 @@ class TestDaymet(unittest.TestCase):
     def test_create_data_config(self):
         data_cfg = config.create_data_config(self.__config["data"])
 
-        self.assertEqual(data_cfg.basins, ["1000", "2000", "3000"])
+        self.assertEqual(data_cfg.basins_file, "./data/basins-test.txt")
         self.assertEqual(data_cfg.streamflow_cfg.data_type, "camels-us")
         self.assertEqual(data_cfg.streamflow_cfg.data_dir, "./data/streamflow")
         self.assertEqual(data_cfg.streamflow_cfg.variables, ["streamflow"])

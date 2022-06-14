@@ -53,8 +53,8 @@ class TestDefaultDatasetProcessor(unittest.TestCase):
         ds_timeseries = ds_timeseries.rename({"index": "time"})
         ds_timeseries = ds_timeseries.assign_coords({"basin": "123"})
 
-        self.__dataset = dataset.HydroDataset(ds_timeseries, ["temp", "prcp"], ["streamflow"],
-                                               "2021-01-01", "2021-01-20")
+        self.__dataset = dataset.HydroDataset(ds_timeseries, ["temp", "prcp"], "streamflow",
+                                              "2021-01-01", "2021-01-20")
 
     def test_fit(self):
         processor = processing.DefaultDatasetProcessor()
@@ -106,7 +106,9 @@ class TestDefaultDatasetProcessor(unittest.TestCase):
         forcings_fit = create_forcings_data_for_fitting()
         streamflow_fit = create_streamflow_data_for_fitting()
         ds_timeseries_fit = xr.Dataset.from_dataframe(forcings_fit.join(streamflow_fit, how="outer"))
-        ds_fit = dataset.HydroDataset(ds_timeseries_fit, ["temp", "prcp"], ["streamflow"], "2021-01-01", "2021-01-20")
+        ds_timeseries_fit = ds_timeseries_fit.rename({"index": "time"})
+        ds_timeseries_fit = ds_timeseries_fit.assign_coords({"basin": "123"})
+        ds_fit = dataset.HydroDataset(ds_timeseries_fit, ["temp", "prcp"], "streamflow", "2021-01-01", "2021-01-20")
 
         processor = processing.DefaultDatasetProcessor()
         processor.fit(ds_fit)

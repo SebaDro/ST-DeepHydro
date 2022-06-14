@@ -47,7 +47,7 @@ def create_one_dimensional_dataset():
     ds_timeseries_2 = ds_timeseries_2.assign_coords({"basin": basin_2})
 
     return dataset.HydroDataset(xr.concat([ds_timeseries_1, ds_timeseries_2], dim="basin"),
-                                feature_variables=["temp", "prcp"], target_variables=["streamflow"])
+                                feature_variables=["temp", "prcp"], target_variable="streamflow")
 
 
 def create_two_dimensional_dataset():
@@ -67,7 +67,7 @@ def create_two_dimensional_dataset():
     streamflow_xr = xr.DataArray(streamflow_data, coords=[basins, dates], dims=["basin", "time"])
 
     return dataset.HydroDataset(xr.Dataset(dict(temp=temp_xr, prcp=prcp_xr, streamflow=streamflow_xr)),
-                                feature_variables=["temp", "prcp"], target_variables=["streamflow"])
+                                feature_variables=["temp", "prcp"], target_variable="streamflow")
 
 
 def create_two_dimensional_joined_dataset():
@@ -87,7 +87,7 @@ def create_two_dimensional_joined_dataset():
     streamflow_xr = xr.DataArray(streamflow_data, coords=[basins, dates], dims=["basin", "time"])
 
     return dataset.HydroDataset(xr.Dataset(dict(temp=temp_xr, prcp=prcp_xr, streamflow=streamflow_xr)),
-                                feature_variables=["temp", "prcp"], target_variables=["streamflow"])
+                                feature_variables=["temp", "prcp"], target_variable=["streamflow"])
 
 
 class TestCustomTimeseriesGenerator(unittest.TestCase):
