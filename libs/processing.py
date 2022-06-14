@@ -4,7 +4,6 @@ import xarray as xr
 
 from libs import dataset
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -149,11 +148,17 @@ class DefaultDatasetProcessor(AbstractProcessor):
         """
         if self.scaling_params is None:
             logger.warning("Processor has not been fit to a dataset before. Thus, it will be fitted to the provided "
-                            "dataset.")
+                           "dataset.")
             self.__fit_scaling_params(ds)
         ds = copy.copy(ds)
         ds.timeseries = self.scale(ds.timeseries)
         return ds
 
     def __fit_scaling_params(self, ds: dataset.HydroDataset):
-        self.scaling_params = (ds.timeseries.min(["time", "y", "x"]), ds.timeseries.max(["time", "y", "x"]))
+        if all(i in ds.timeseries.coords for i in ["basin", "time", "y", "x"]):
+            self.scaling_params = (ds.timeseries.min(["time", "y", "x"]), ds.timeseries.max(["time", "y", "x"]))
+        elif all(i in ds.timeseries.coords for i in ["basin", "time"]):
+            self.scaling_params = (ds.timeseries.min(["time"]), ds.timeseries.max(["time"]))
+        else:
+            raise ValueError(f"Coordinates should contain one of the sets: ['basin', 'time'],"
+                             f"['basin', 'time', 'y', 'x']. Actual coordinates are: {list(ds.timeseries.coords)}")
