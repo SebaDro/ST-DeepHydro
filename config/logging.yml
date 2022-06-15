@@ -1,0 +1,25 @@
+version: 1
+disable_existing_loggers: True
+formatters:
+  simple:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: simple
+    stream: ext://sys.stdout
+  file_handler:
+    class: logging.FileHandler
+    level: INFO
+    formatter: simple
+    filename: ./output/st-deep-hydro.log
+    encoding: utf8
+loggers:
+  libs:
+    level: DEBUG
+    handlers: [console]
+    propagate: no
+root:
+  level: DEBUG
+  handlers: [console]

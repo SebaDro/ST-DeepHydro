@@ -1,0 +1,53 @@
+data:
+  basinsFile: "./config/basins.txt"
+  forcings:
+    dir: "./data/forcings"
+    type: "daymet"
+    variables:
+      - "prcp"
+      - "tmin"
+      - "tmax"
+      - "srad"
+      - "vp"
+  streamflow:
+    dir: "./data/streamflow"
+    type: "camels-us"
+    variables:
+      - "streamflow"
+  training:
+    startDate: "1980-01-01"
+    endDate: "2003-12-31"
+  validation:
+    startDate: "2004-01-01"
+    endDate: "2009-12-31"
+  test:
+    startDate: "2010-01-01"
+    endDate: "2014-12-31"
+model:
+  type: "cnn-lstm"
+  timesteps: 20
+  offset: 1
+  loss:
+    - "mse"
+  metrics:
+    - "mse"
+    - "mae"
+  optimizer: "Adam"
+  epochs: 10
+  batchSize: 32
+  multiOutput: false
+  params:
+    lstm:
+      hiddenLayers: 2
+      units:
+        - 32
+        - 32
+      dropout:
+        - 0.1
+        - 0
+general:
+  name: "cnnlstm"
+  outputDir: "./output"
+  saveModel: true
+  saveCheckpoints: true
+
