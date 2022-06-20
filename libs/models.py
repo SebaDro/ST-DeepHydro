@@ -251,45 +251,74 @@ class LstmModel(AbstractModel):
 class CnnLstmModel(AbstractModel):
 
     def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None):
-        hidden_layers, units, dropout = params
+        hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout = params
 
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(8, (3, 3), activation="relu", padding="same")),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same")),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same")),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()),
         ])
 
-        for i in range(0, hidden_layers - 1):
+        # CNN layers
+        for i in range(0, hidden_cnn_layers - 1):
+            model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(filters[i], (3, 3), activation="relu",
+                                                                             padding="same")))
+            model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
+        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(filters[hidden_cnn_layers - 1], (3, 3),
+                                                                         activation="relu", padding="same")))
+        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()))
+
+        # LSTM layers
+        for i in range(0, hidden_lstm_layers - 1):
             model.add(tf.keras.layers.LSTM(units[i], return_sequences=True, dropout=dropout[i], use_bias=True))
-        model.add(tf.keras.layers.LSTM(units[hidden_layers - 1], use_bias=True))
+        model.add(tf.keras.layers.LSTM(units[hidden_lstm_layers - 1], use_bias=True))
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
         else:
             model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
-    def _get_and_validate_params(self, params: dict):
+    def __get_and_validate_lstm_params(self, params: dict):
         try:
-            lstm_params = params["lstm"]
-            hidden_layers = lstm_params["hiddenLayers"]
-            units = lstm_params["units"]
+            hidden_layers = params["hiddenLayers"]
+            units = params["units"]
             if not isinstance(hidden_layers, int):
                 raise config.ConfigError(
-                    f"Wrong type of 'hidden_layers' parameter: {type(hidden_layers)}. Expected: 'int'")
+                    f"Wrong type of 'hiddenLayers' parameter: {type(hidden_layers)}. Expected: 'int'")
             if hidden_layers < 0:
                 raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
             if len(units) != hidden_layers:
                 raise config.ConfigError(
                     f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")
-            dropout = lstm_params["dropout"]
+            dropout = params["dropout"]
             if len(dropout) != hidden_layers:
                 raise config.ConfigError(
                     f"Wrong number of dropout definitions: {len(dropout)}. Expected: {hidden_layers}")
             return hidden_layers, units, dropout
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
+    def __get_and_validate_cnn_params(self, params: dict):
+        try:
+            hidden_layers = params["hiddenLayers"]
+            filters = params["filters"]
+            if not isinstance(hidden_layers, int):
+                raise config.ConfigError(
+                    f"Wrong type of 'hiddenLayers' parameter: {type(hidden_layers)}. Expected: 'int'")
+            if hidden_layers < 0:
+                raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
+            if len(filters) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(filters)}. Expected: {hidden_layers}")
+            return hidden_layers, filters
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
+    def _get_and_validate_params(self, params: dict):
+        try:
+            cnn_params = params["cnn"]
+            hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
+            lstm_params = params["lstm"]
+            hidden_lstm_layers, units, dropout = self.__get_and_validate_lstm_params(lstm_params)
+            return hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 

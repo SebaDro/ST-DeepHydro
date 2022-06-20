@@ -37,6 +37,12 @@ model:
   batchSize: 32
   multiOutput: false
   params:
+    cnn:
+      hiddenLayers: 3
+      filters:
+        - 8
+        - 16
+        - 32
     lstm:
       hiddenLayers: 2
       units:
