@@ -6,19 +6,19 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO
+    level: DEBUG
     formatter: simple
     stream: ext://sys.stdout
-  file_handler:
+  file:
     class: logging.FileHandler
-    level: INFO
+    level: DEBUG
     formatter: simple
     filename: ./output/st-deep-hydro.log
     encoding: utf8
 loggers:
   libs:
     level: DEBUG
-    handlers: [console]
+    handlers: [console, file]
     propagate: no
 root:
   level: DEBUG
