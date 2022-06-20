@@ -255,11 +255,10 @@ class CnnLstmModel(AbstractModel):
 
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (1, 1), activation="relu", padding="same")),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(8, (3, 3), activation="relu", padding="same")),
+            tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
             tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))),
-            tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same")),
             tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()),
         ])
@@ -300,13 +299,12 @@ class ConvLstmModel(AbstractModel):
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
-            tf.keras.layers.ConvLSTM2D(32, (1, 1), activation="relu", padding="same", return_sequences=True),
-            tf.keras.layers.ConvLSTM2D(16, (3, 3), activation="relu", padding="same", return_sequences=True),
+            tf.keras.layers.ConvLSTM2D(8, (3, 3), activation="relu", padding="same", return_sequences=True),
+            tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
             tf.keras.layers.ConvLSTM2D(16, (3, 3), activation="relu", padding="same", return_sequences=True),
             tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),
-            tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=True),
             tf.keras.layers.ConvLSTM2D(32, (3, 3), activation="relu", padding="same", return_sequences=False),
-            tf.keras.layers.GlobalMaxPooling2D()
+            tf.keras.layers.GlobalMaxPooling2D(),
         ])
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
@@ -323,12 +321,11 @@ class Conv3DModel(AbstractModel):
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
-            tf.keras.layers.Conv3D(32, (1, 1, 1), activation="relu", padding="same"),
-            tf.keras.layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same"),
-            tf.keras.layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.Conv3D(8, (1, 3, 3), activation="relu", padding="same"),
             tf.keras.layers.MaxPooling3D((1, 2, 2)),
-            tf.keras.layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same"),
-            tf.keras.layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.Conv3D(16, (1, 3, 3), activation="relu", padding="same"),
+            tf.keras.layers.MaxPooling3D((1, 2, 2)),
+            tf.keras.layers.Conv3D(32, (1, 3, 3), activation="relu", padding="same"),
             tf.keras.layers.GlobalMaxPooling3D()
         ])
         if output_size is None:
