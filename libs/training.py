@@ -140,5 +140,5 @@ def run_training(cfg: config.Config, dry_run):
             logger.exception(f"Training stopped for basin {basin} due to an unexpected error that occurred during"
                              f" evaluating the model.")
     if not dry_run:
-        res_out_path = common_eval_res.save(cfg.general_config.output_dir)
-        logger.info(f"Stored common evaluation results '{res_out_path}'.")
+        res_out_path = common_eval_res.save(work_dir)
+        logger.info(f"Stored common evaluation results '{work_dir}'.")
