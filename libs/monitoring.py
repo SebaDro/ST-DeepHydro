@@ -4,16 +4,16 @@ from libs import config
 
 
 class TrainingMonitor:
-    def __init__(self, out_dir: str, save_checkpoints: bool, save_model: bool):
+    def __init__(self, out_dir: str, save_checkpoints: bool, log_tensorboard_events: bool):
         self.__out_dir = out_dir
         self.__save_checkpoints = save_checkpoints
-        self.__save_model = save_model
+        self.__log_tensorboard_events = log_tensorboard_events
 
     def get_callbacks(self):
         callbacks = []
         if self.__save_checkpoints:
             callbacks.append(self.__create_checkpoint_callback())
-        if self.__save_model:
+        if self.__log_tensorboard_events:
             callbacks.append(self.__create_tensorboard_callback())
         return callbacks
 
@@ -31,4 +31,4 @@ def training_monitor_factory(cfg: config.GeneralConfig, out_dir: str):
         out_dir = os.path.join(cfg.output_dir, cfg.name)
     else:
         out_dir = out_dir
-    return TrainingMonitor(out_dir, cfg.save_checkpoints, cfg.save_model)
+    return TrainingMonitor(out_dir, cfg.save_checkpoints, cfg.log_tensorboard_events)

@@ -9,11 +9,12 @@ class ConfigError(Exception):
 
 
 class GeneralConfig:
-    def __init__(self, name, output_dir, save_checkpoints, save_model):
+    def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events):
         self.__name = name
         self.__output_dir = output_dir
         self.__save_checkpoints = save_checkpoints
         self.__save_model = save_model
+        self.__log_tensorboard_events = log_tensorboard_events
 
     @property
     def name(self):
@@ -30,6 +31,10 @@ class GeneralConfig:
     @property
     def save_model(self):
         return self.__save_model
+
+    @property
+    def log_tensorboard_events(self):
+        return self.__log_tensorboard_events
 
 
 class DatasetConfig:
@@ -214,7 +219,8 @@ def create_general_config(cfg: dict) -> GeneralConfig:
         Object containing general config parameters that
 
     """
-    return GeneralConfig(cfg["name"], cfg["outputDir"], cfg["saveModel"], cfg["saveCheckpoints"])
+    return GeneralConfig(cfg["name"], cfg["outputDir"], cfg["saveModel"], cfg["saveCheckpoints"],
+                         cfg["logTensorboardEvents"])
 
 
 def create_dataset_config(cfg: dict) -> DatasetConfig:

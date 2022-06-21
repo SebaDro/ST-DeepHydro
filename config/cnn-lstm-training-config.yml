@@ -52,6 +52,7 @@ model:
         - 0.1
         - 0
 general:
+  logTensorboardEvents: true
   name: "cnnlstm"
   outputDir: "./output"
   saveModel: true
