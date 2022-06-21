@@ -203,6 +203,7 @@ class AbstractModel:
         """
         storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
+        return storage_path
 
     def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
         if self._config.multi_output:

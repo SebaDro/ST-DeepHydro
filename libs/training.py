@@ -124,6 +124,9 @@ def run_training(cfg: config.Config, dry_run):
             eval_res = run_evaluation(model, ds_test, processor, cfg.data_config.streamflow_cfg.variables[0], basin)
 
             if not dry_run:
+                if cfg.general_config.save_model:
+                    storage_path = model.save_model(out_dir)
+                    logger.info(f"Stored model: '{storage_path}'.")
                 common_eval_res.append_evaluation_results(eval_res)
                 res_out_path = eval_res.save(out_dir)
                 logger.info(f"Stored evaluation results: '{res_out_path}'.")
