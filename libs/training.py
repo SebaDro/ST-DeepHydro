@@ -126,7 +126,7 @@ def run_training(cfg: config.Config, dry_run):
             if not dry_run:
                 common_eval_res.append_evaluation_results(eval_res)
                 res_out_path = eval_res.save(out_dir)
-                logger.info(f"Stored evaluation results '{res_out_path}'.")
+                logger.info(f"Stored evaluation results: '{res_out_path}'.")
             logger.info(f"Successfully finished training for basin {basin}.")
         except config.ConfigError:
             logger.exception(f"Training stopped for basin {basin} due to incorrect configuration parameters.")
@@ -141,4 +141,4 @@ def run_training(cfg: config.Config, dry_run):
                              f" evaluating the model.")
     if not dry_run:
         res_out_path = common_eval_res.save(work_dir)
-        logger.info(f"Stored common evaluation results '{work_dir}'.")
+        logger.info(f"Stored evaluation results for all basins: '{res_out_path}'.")
