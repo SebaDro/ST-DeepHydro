@@ -265,7 +265,8 @@ class CnnLstmModel(AbstractModel):
             model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
         model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(filters[hidden_cnn_layers - 1], (3, 3),
                                                                          activation="relu", padding="same")))
-        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()))
+        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
+        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()))
 
         # LSTM layers
         for i in range(0, hidden_lstm_layers - 1):
