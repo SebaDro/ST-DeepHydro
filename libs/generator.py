@@ -3,6 +3,10 @@ import numpy as np
 import pandas as pd
 from tensorflow.keras.utils import Sequence
 import xarray as xr
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class CustomTimeseriesGenerator(Sequence):
@@ -56,11 +60,11 @@ class CustomTimeseriesGenerator(Sequence):
         self.joined_features = joined_features
         self.input_shape = input_shape
         self.idx_dict = self.__get_idx_df(drop_na, joined_features)
-        self.ds_inputs = self.xds[feature_vars].to_array()
+        self.ds_inputs = self.xds[feature_vars].to_array().values
         if joined_features:
-            self.ds_targets = self.xds[[target_var]].to_array()
+            self.ds_targets = self.xds[[target_var]].to_array().values
         else:
-            self.ds_targets = self.xds[[target_var]].to_array()
+            self.ds_targets = self.xds[[target_var]].to_array().values
 
     def __get_idx_df(self, drop_na: bool, joined_output: bool):
         lag = self.timesteps + self.offset - 1
@@ -89,33 +93,27 @@ class CustomTimeseriesGenerator(Sequence):
 
     def __getitem__(self, idx):
         df_batch = self.idx_dict[idx * self.batch_size:(idx + 1) * self.batch_size]
-
-        if self.input_shape:
-            inputs = np.empty((0,) + self.input_shape)
-        else:
-            shape = self._get_input_shape()
-            inputs = np.empty(shape)
-        if self.joined_features:
-            targets = np.empty((0, len(self.xds.basin.values)))
-        else:
-            targets = np.empty((0, 1))
+        input_list = []
+        target_list = []
 
         for index, row in df_batch.iterrows():
             start_date_idx = row.time_idx - self.timesteps
             end_date_idx = row.time_idx - self.offset + 1
             if self.joined_features:
-                forcings_values = self.ds_inputs[:, start_date_idx:end_date_idx, ...].values
+                forcings_values = self.ds_inputs[:, start_date_idx:end_date_idx, ...]
                 forcings_values = np.moveaxis(forcings_values, 0, -1)
-                inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
-                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
-                targets = np.vstack([targets, streamflow_values])
+                input_list.append(np.expand_dims(forcings_values, axis=0))
+                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx]
+                target_list.append(streamflow_values)
             else:
-                forcings_values = self.ds_inputs[:, row.basin_idx, start_date_idx:end_date_idx, ...].values
+                forcings_values = self.ds_inputs[:, row.basin_idx, start_date_idx:end_date_idx, ...]
                 forcings_values = np.moveaxis(forcings_values, 0, -1)
-                inputs = np.vstack([inputs, np.expand_dims(forcings_values, axis=0)])
-                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx].values
-                targets = np.vstack([targets, np.expand_dims(streamflow_values, axis=0)])
+                input_list.append(np.expand_dims(forcings_values, axis=0))
+                streamflow_values = self.ds_targets[:, row.basin_idx, row.time_idx]
+                target_list.append(np.expand_dims(streamflow_values, axis=0))
 
+        inputs = np.vstack(input_list)
+        targets = np.vstack(target_list)
         return inputs, targets
 
     def _get_input_shape(self):
