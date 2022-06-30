@@ -108,7 +108,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         gen = generator.CustomTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
                                                   target_col, False)
         exp_shape = (0, 8, 2)
-        self.assertEqual(exp_shape, gen._get_input_shape())
+        self.assertEqual(exp_shape, gen._get_input_shapes()[0])
 
     def test_get_input_shape_2d(self):
         batch_size = 6
@@ -120,7 +120,7 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
                                                   target_col, False)
         exp_shape = (0, 6, 12, 14, 2)
-        self.assertEqual(exp_shape, gen._get_input_shape())
+        self.assertEqual(exp_shape, gen._get_input_shapes()[0])
 
     def test_timeseries_generation(self):
         batch_size = 6
