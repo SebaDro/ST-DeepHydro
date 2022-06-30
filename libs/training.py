@@ -9,38 +9,43 @@ from libs import monitoring
 from libs import processing
 from libs import evaluation
 from libs import dataloader
+from typing import List
 
 
 logger = logging.getLogger(__name__)
 
 
-def run_data_preparation(cfg: config.Config, data_loader: dataloader.HydroDataLoader,
-                         processor: processing.AbstractProcessor, basin: str):
-    logger.info(f"Load '{cfg.data_config.forcings_cfg.data_type}' forcings and "
-                f"'{cfg.data_config.streamflow_cfg.data_type}' streamflow data.")
+def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.HydroDataLoader],
+                         processor_list: List[processing.AbstractProcessor], basin: str):
+    for f_cfg in cfg.data_config.forcings_cfg:
+        logger.info(f"Load '{f_cfg}' forcings.")
+    logger.info(f"Load '{cfg.data_config.streamflow_cfg.data_type}' streamflow data.")
     logger.debug(f"Split datasets: training start date {cfg.data_config.training_cfg.start_date}, "
                  f"training end date {cfg.data_config.training_cfg.end_date}; "
                  f"validation start date {cfg.data_config.validation_cfg.start_date}, "
                  f"validation end date {cfg.data_config.validation_cfg.end_date}; "
                  f"test start date {cfg.data_config.test_cfg.start_date}, "
                  f"test end date {cfg.data_config.test_cfg.end_date}")
+    ds_train_list = []
+    ds_validation_list = []
+    ds_test_list = []
     try:
-        ds_train = data_loader.load_single_dataset(cfg.data_config.training_cfg.start_date,
-                                                   cfg.data_config.training_cfg.end_date,
-                                                   basin)
-        ds_validation = data_loader.load_single_dataset(cfg.data_config.validation_cfg.start_date,
-                                                        cfg.data_config.validation_cfg.end_date,
-                                                        basin)
-        ds_test = data_loader.load_single_dataset(cfg.data_config.test_cfg.start_date,
-                                                  cfg.data_config.test_cfg.end_date, basin)
-
-        logger.info(f"Preprocess datasets using '{type(processor)}'.")
-        processor.fit(ds_train)
-        ds_train = processor.process(ds_train)
-        ds_validation = processor.process(ds_validation)
-        ds_test = processor.process(ds_test)
-
-        return ds_train, ds_validation, ds_test
+        for i, data_loader in enumerate(data_loader_list):
+            ds_train = data_loader.load_single_dataset(cfg.data_config.training_cfg.start_date,
+                                                       cfg.data_config.training_cfg.end_date,
+                                                       basin)
+            ds_validation = data_loader.load_single_dataset(cfg.data_config.validation_cfg.start_date,
+                                                            cfg.data_config.validation_cfg.end_date,
+                                                            basin)
+            ds_test = data_loader.load_single_dataset(cfg.data_config.test_cfg.start_date,
+                                                      cfg.data_config.test_cfg.end_date, basin)
+            processor = processor_list[i]
+            logger.info(f"Preprocess datasets using '{type(processor)}'.")
+            processor.fit(ds_train)
+            ds_train_list.append(processor.process(ds_train))
+            ds_validation_list.append(processor.process(ds_validation))
+            ds_test_list.append(processor.process(ds_test))
+        return ds_train_list, ds_validation_list, ds_test_list
     except KeyError as e:
         raise common.DataPreparationError("Error during data preparation due to failing variable access.") from e
     except ValueError as e:
@@ -51,11 +56,12 @@ def run_data_preparation(cfg: config.Config, data_loader: dataloader.HydroDataLo
         raise common.DataPreparationError("Error during data preparation while trying to read a file.") from e
 
 
-def run_build_and_compile_model(cfg: config.Config, ds_train, ds_validation, out_dir=None):
+def run_build_and_compile_model(cfg: config.Config, ds_train_list, ds_validation_list, out_dir=None):
     logger.info(f"Build model of type '{cfg.model_config.model_type}'.")
     try:
         model = models.factory(cfg.model_config)
-        model.build(input_shape=(cfg.model_config.timesteps,) + ds_train.get_input_shape())
+        shape_list = [(cfg.model_config.timesteps[i],) + ds.get_input_shape() for i, ds in enumerate(ds_train_list)]
+        model.build(input_shape=shape_list) if len(shape_list) > 1 else model.build(input_shape=shape_list[0])
         model.model.summary(print_fn=logger.debug)
 
         monitor = None
@@ -67,7 +73,7 @@ def run_build_and_compile_model(cfg: config.Config, ds_train, ds_validation, out
                                                  cfg.general_config.save_model)
 
         logger.info("Start fitting model to training data...")
-        model.compile_and_fit(ds_train, ds_validation, monitor=monitor)
+        model.compile_and_fit(ds_train_list, ds_validation_list, monitor=monitor)
         logger.info("Finished fitting model to training data.")
         return model
     except ValueError as e:
@@ -78,14 +84,15 @@ def run_build_and_compile_model(cfg: config.Config, ds_train, ds_validation, out
         raise common.TrainingError("Error during model fitting due to an unsupported calculation.") from e
 
 
-def run_evaluation(model, ds_test, processor, target_var, basin) -> evaluation.Evaluation:
+def run_evaluation(model, ds_test_list, processor_list, target_var, basin) -> evaluation.Evaluation:
     logger.info("Start evaluating model...")
-    ds_prediction = model.predict(ds_test, basin, as_dataset=True, remove_nan=False)
-    result = model.evaluate(ds_test, True, basin)
+    ds_prediction = model.predict(ds_test_list, basin, as_dataset=True, remove_nan=False)
+    result = model.evaluate(ds_test_list, True, basin)
 
     # Rescale predictions and observation to the origin uom
+    processor = processor_list[0]
     ds_prediction = processor.rescale(ds_prediction)
-    ds_observation = processor.rescale(ds_test.timeseries)
+    ds_observation = processor.rescale(ds_test_list[0].timeseries)
 
     ds_eval = evaluation.calc_evaluation(ds_observation, ds_prediction, target_var, basin)
 
@@ -102,8 +109,13 @@ def run_training(cfg: config.Config, dry_run):
         work_dir = ioutils.create_out_dir(cfg.general_config.output_dir, cfg.general_config.name)
         logger.info(f"Created working directory '{work_dir}'.")
 
-    data_loader = dataloader.HydroDataLoader.from_config(cfg.data_config)
-    processor = processing.DefaultDatasetProcessor()
+    data_loader_list = []
+    processor_list = []
+    for f_cfg in cfg.data_config.forcings_cfg:
+        data_loader = dataloader.HydroDataLoader.from_config(cfg.data_config.basins_file, f_cfg, cfg.data_config.streamflow_cfg)
+        data_loader_list.append(data_loader)
+        processor = processing.DefaultDatasetProcessor()
+        processor_list.append(processor)
     common_eval_res = evaluation.Evaluation()
 
     with open(cfg.data_config.basins_file, 'r') as file:
@@ -119,9 +131,9 @@ def run_training(cfg: config.Config, dry_run):
             out_dir = os.path.join(work_dir, basin)
         try:
             logger.info(f"Prepare data for basin {basin}.")
-            ds_train, ds_validation, ds_test = run_data_preparation(cfg, data_loader, processor, basin)
-            model = run_build_and_compile_model(cfg, ds_train, ds_validation, out_dir)
-            eval_res = run_evaluation(model, ds_test, processor, cfg.data_config.streamflow_cfg.variables[0], basin)
+            ds_train_list, ds_validation_list, ds_test_list = run_data_preparation(cfg, data_loader_list, processor_list, basin)
+            model = run_build_and_compile_model(cfg, ds_train_list, ds_validation_list, out_dir)
+            eval_res = run_evaluation(model, ds_test_list, processor_list, cfg.data_config.streamflow_cfg.variables[0], basin)
 
             if not dry_run:
                 if cfg.general_config.save_model:

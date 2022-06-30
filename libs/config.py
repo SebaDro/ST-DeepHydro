@@ -1,5 +1,6 @@
 import logging
 import yaml
+from typing import Union, List
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class DataConfig:
     Holds configuration parameters required for creating training, validation and test datasets from forcings and
     streamflow data.
     """
-    def __init__(self, basins_file: str, forcings_cfg: DataTypeConfig, streamflow_cfg: DataTypeConfig,
+    def __init__(self, basins_file: str, forcings_cfg: List[DataTypeConfig], streamflow_cfg: DataTypeConfig,
                  training_cfg: DatasetConfig, validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
         self.__basins_file = basins_file
         self.__forcings_cfg = forcings_cfg
@@ -110,8 +111,8 @@ class DataConfig:
 
 
 class ModelConfig:
-    def __init__(self, model_type: str, timesteps: int, offset: int, loss: list, metrics: list, optimizer: str,
-                 epochs: int, batch_size: int, multi_output: bool, params: dict = None):
+    def __init__(self, model_type: str, timesteps: Union[int, List[int]], offset: int, loss: list, metrics: list,
+                 optimizer: str, epochs: int, batch_size: int, multi_output: bool, params: dict = None):
         self.__model_type = model_type
         self.__timesteps = timesteps
         self.__offset = offset
@@ -273,7 +274,7 @@ def create_data_config(cfg: dict) -> DataConfig:
         Object containing config parameters controlling the reading of streamflow and forcing datasets
 
     """
-    return DataConfig(cfg["basinsFile"], create_dataype_config(cfg["forcings"]),
+    return DataConfig(cfg["basinsFile"], [create_dataype_config(c) for c in cfg["forcings"]],
                       create_dataype_config(cfg["streamflow"]), create_dataset_config(cfg["training"]),
                       create_dataset_config(cfg["validation"]), create_dataset_config(cfg["test"]))
 

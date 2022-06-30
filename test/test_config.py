@@ -14,7 +14,7 @@ class TestDaymet(unittest.TestCase):
         self.assertEqual(ds_cfg.end_date, "2003-12-31")
 
     def test_create_datype_config(self):
-        dt_cfg = config.create_dataype_config(self.__config["data"]["forcings"])
+        dt_cfg = config.create_dataype_config(self.__config["data"]["forcings"][0])
 
         self.assertEqual(dt_cfg.data_dir, "./data/forcings")
         self.assertEqual(dt_cfg.data_type, "camels-us")
@@ -23,7 +23,7 @@ class TestDaymet(unittest.TestCase):
     def test_create_data_config(self):
         data_cfg = config.create_data_config(self.__config["data"])
 
-        self.assertEqual(data_cfg.basins_file, "./data/basins-test.txt")
+        self.assertEqual(data_cfg.basins_file, "./data/basins-all.txt")
         self.assertEqual(data_cfg.streamflow_cfg.data_type, "camels-us")
         self.assertEqual(data_cfg.streamflow_cfg.data_dir, "./data/streamflow")
         self.assertEqual(data_cfg.streamflow_cfg.variables, ["streamflow"])
@@ -36,7 +36,7 @@ class TestDaymet(unittest.TestCase):
         model_cfg = config.create_model_config(self.__config["model"])
 
         self.assertEqual(model_cfg.model_type, "lstm")
-        self.assertEqual(model_cfg.timesteps, 20)
+        self.assertEqual(model_cfg.timesteps[0], 20)
         self.assertEqual(model_cfg.offset, 1)
         self.assertEqual(model_cfg.loss, ["mse"])
         self.assertEqual(model_cfg.metrics, ["mse", "mae"])

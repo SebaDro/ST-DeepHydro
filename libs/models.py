@@ -1,7 +1,10 @@
+from abc import ABC
+
 import numpy as np
 import os
 import tensorflow as tf
 import xarray as xr
+from typing import Union, List
 from libs import config
 from libs import dataset
 from libs import generator
@@ -28,7 +31,7 @@ class AbstractModel:
     def history(self):
         return self.__history
 
-    def build(self, input_shape: tuple, output_size: int = None):
+    def build(self, input_shape: Union[tuple, List[tuple]], output_size: int = None):
         """
         Builds the model architecture in accordance to the config.ModelConfig that has been passed for model
         instantiation and a given input_shape.
@@ -48,13 +51,14 @@ class AbstractModel:
         param_tuple = self._get_and_validate_params(self._config.params)
         self.__model = self._build_model(input_shape, param_tuple, output_size)
 
-    def _build_model(self, input_shape: tuple, params: tuple, output_size):
+    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size):
         raise NotImplementedError
 
     def _get_and_validate_params(self, params: dict):
         raise NotImplementedError
 
-    def compile_and_fit(self, training_ds: dataset.HydroDataset, validation_ds: dataset.HydroDataset,
+    def compile_and_fit(self, training_ds_list: List[dataset.HydroDataset],
+                        validation_ds_list: List[dataset.HydroDataset],
                         monitor: monitoring.TrainingMonitor = None) -> tf.keras.callbacks.History:
         """
         Compiles and fits a model using the given model training and validation datasets. For fitting the model
@@ -78,8 +82,8 @@ class AbstractModel:
                              optimizer=self._config.optimizer,
                              metrics=self._config.metrics)
 
-        training_gen = self.__create_timeseries_generator(training_ds)
-        validation_gen = self.__create_timeseries_generator(validation_ds)
+        training_gen = self.__create_timeseries_generator(training_ds_list)
+        validation_gen = self.__create_timeseries_generator(validation_ds_list)
 
         callbacks = monitor.get_callbacks() if monitor is not None else None
 
@@ -88,7 +92,7 @@ class AbstractModel:
 
         return self.__history
 
-    def evaluate(self, test_ds: dataset.HydroDataset, as_dataset: bool = False, basin: str = None):
+    def evaluate(self, test_ds_list: List[dataset.HydroDataset], as_dataset: bool = False, basin: str = None):
         """
         Evaluates the trained model against the given dataset. The dataset will be wrapped by timeseries generator
         which aims as input for model evaluating. All metrics that have been specified as part of the model
@@ -110,7 +114,7 @@ class AbstractModel:
             Evaluation metric either as dictionary or as basin indexed xarray.Dataset
 
         """
-        test_gen = self.__create_timeseries_generator(test_ds)
+        test_gen = self.__create_timeseries_generator(test_ds_list)
         result = self.__model.evaluate(test_gen, return_dict=True)
         if as_dataset and basin is not None:
             res_dict = {}
@@ -120,7 +124,7 @@ class AbstractModel:
         else:
             return result
 
-    def predict(self, ds: dataset.HydroDataset, basin: str, as_dataset: bool = True, remove_nan: bool = False):
+    def predict(self, ds_list: List[dataset.HydroDataset], basin: str, as_dataset: bool = True, remove_nan: bool = False):
         """
         Uses the trained model the calculate predictions for the given dataset.
 
@@ -141,10 +145,10 @@ class AbstractModel:
             Model predictions
 
         """
-        gen = self.__create_timeseries_generator(ds, remove_nan)
+        gen = self.__create_timeseries_generator(ds_list, remove_nan)
         predictions = self.__model.predict(gen)
         if as_dataset:
-            return self.prediction_to_dataset(ds, predictions, basin, remove_nan)
+            return self.prediction_to_dataset(ds_list[0], predictions, basin, remove_nan)
         else:
             return predictions
 
@@ -174,7 +178,11 @@ class AbstractModel:
         Model predictions as xarray.Dataset
 
         """
-        target_start_date = np.datetime64(ds.start_date) + np.timedelta64(self._config.timesteps, 'D') + np.timedelta64(
+        if isinstance(self._config.timesteps, int):
+            timesteps = self._config.timesteps
+        else:
+            timesteps = self._config.timesteps[0]
+        target_start_date = np.datetime64(ds.start_date) + np.timedelta64(timesteps, 'D') + np.timedelta64(
             self._config.offset, 'D') - np.timedelta64(1, 'D')
         res_ds = ds.timeseries.sel(time=slice(target_start_date, np.datetime64(ds.end_date)))
 
@@ -205,14 +213,17 @@ class AbstractModel:
         self.model.save(storage_path)
         return storage_path
 
-    def __create_timeseries_generator(self, ds: dataset.HydroDataset, remove_nan: bool = True):
+    def __create_timeseries_generator(self, ds_list: List[dataset.HydroDataset], remove_nan: bool = True):
+        feature_cols = ds_list[0].feature_cols
+        target_col = ds_list[0].target_col
+        timeseries = [ds.timeseries for ds in ds_list]
         if self._config.multi_output:
-            return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, ds.feature_cols, ds.target_col,
+            return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
+                                                       self._config.offset, feature_cols, target_col,
                                                        remove_nan, True)
         else:
-            return generator.CustomTimeseriesGenerator(ds.timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, ds.feature_cols, ds.target_col,
+            return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
+                                                       self._config.offset, feature_cols, target_col,
                                                        remove_nan, False)
 
 
@@ -265,8 +276,9 @@ class CnnLstmModel(AbstractModel):
             model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
         model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(filters[hidden_cnn_layers - 1], (3, 3),
                                                                          activation="relu", padding="same")))
-        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
-        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()))
+        model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D()))
+        # model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2))))
+        # model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()))
 
         # LSTM layers
         for i in range(0, hidden_lstm_layers - 1):
@@ -325,6 +337,45 @@ class CnnLstmModel(AbstractModel):
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
 
+class MultiInputCnnLstmModel(AbstractModel):
+
+    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None):
+        input_1 = tf.keras.layers.Input(shape=input_shape[0])
+        lstm_1 = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(input_1)
+        lstm_2 = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(lstm_1)
+
+        # CNN-LSTM
+        input_2 = tf.keras.layers.Input(shape=input_shape[1])
+        conv2d_1 = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Conv2D(8, (3, 3), activation="relu", padding="same"))(
+            input_2)
+        maxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_1)
+        conv2d_2 = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same"))(
+            maxpooling_1)
+        maxpooling_2 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_2)
+        conv2d_3 = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
+            maxpooling_2)
+        globalmaxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D())(conv2d_3)
+        cnn_lstm_1 = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(globalmaxpooling_1)
+        cnn_lstm_2 = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(cnn_lstm_1)
+
+        # Concatenate
+        concat = tf.keras.layers.concatenate([lstm_2, cnn_lstm_2])
+
+        # Output
+        dense_1 = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)(concat)
+        output = tf.keras.layers.Dense(1)(dense_1)
+
+        # Full model
+        model = tf.keras.Model(inputs=[input_1, input_2], outputs=output)
+        return model
+
+    def _get_and_validate_params(self, params: dict):
+        pass
+
+
 class ConvLstmModel(AbstractModel):
 
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
@@ -337,10 +388,10 @@ class ConvLstmModel(AbstractModel):
         for i in range(0, hidden_cnn_layers - 1):
             model.add(tf.keras.layers.ConvLSTM2D(filters[i], (3, 3), activation="relu", padding="same",
                                                  return_sequences=True))
-            model.add(tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)),)
+            model.add(tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)), )
         model.add(tf.keras.layers.ConvLSTM2D(filters[hidden_cnn_layers - 1], (3, 3), activation="relu", padding="same",
                                              return_sequences=False))
-        model.add(tf.keras.layers.GlobalMaxPooling2D(),)
+        model.add(tf.keras.layers.GlobalMaxPooling2D(), )
 
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
@@ -400,6 +451,8 @@ def factory(cfg: config.ModelConfig) -> AbstractModel:
         return LstmModel(cfg)
     if cfg.model_type == "cnn-lstm":
         return CnnLstmModel(cfg)
+    if cfg.model_type == "multi-cnn-lstm":
+        return MultiInputCnnLstmModel(cfg)
     if cfg.model_type == "convlstm":
         return ConvLstmModel(cfg)
     if cfg.model_type == "conv3d":

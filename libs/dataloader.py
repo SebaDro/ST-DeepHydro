@@ -323,7 +323,7 @@ class HydroDataLoader:
         self.__streamflow_variable = streamflow_var
 
     @classmethod
-    def from_config(cls, data_cfg: config.DataConfig):
+    def from_config(cls, basins_file, forcings_cfg: config.DataTypeConfig, streamflow_cfg: config.DataTypeConfig):
         """
         Creates a HydroDataLoader instance from configurations.
 
@@ -332,9 +332,9 @@ class HydroDataLoader:
 
         Parameters
         ----------
-        data_cfg: config.DataConfig
-            DataConfig that holds data configuration parameters, such as basins, data directories and variables which
-            will be used for loading and subsetting the forcings and streamflow datasets.
+        basins_file
+        forcings_cfg
+        streamflow_cfg
 
         Returns
         -------
@@ -342,17 +342,17 @@ class HydroDataLoader:
             A HydroDataLoader instance
 
         """
-        with open(data_cfg.basins_file, 'r') as file:
+        with open(basins_file, 'r') as file:
             basins = [line.strip() for line in file.readlines()]
-        forcings_dl = forcings_factory(data_cfg.forcings_cfg.data_type, basins, data_cfg.forcings_cfg.data_dir,
-                                       data_cfg.forcings_cfg.variables)
-        streamflow_dl = streamflow_factory(data_cfg.streamflow_cfg.data_type, basins, data_cfg.streamflow_cfg.data_dir,
-                                           data_cfg.streamflow_cfg.variables)
-        if len(data_cfg.streamflow_cfg.variables) > 0:
-            logger.warning(f"Configuration contains {len(data_cfg.streamflow_cfg.variables)} streamflow variables,"
+        forcings_dl = forcings_factory(forcings_cfg.data_type, basins, forcings_cfg.data_dir,
+                                       forcings_cfg.variables)
+        streamflow_dl = streamflow_factory(streamflow_cfg.data_type, basins, streamflow_cfg.data_dir,
+                                           streamflow_cfg.variables)
+        if len(streamflow_cfg.variables) > 0:
+            logger.warning(f"Configuration contains {len(streamflow_cfg.variables)} streamflow variables,"
                            f" but only one is supported for training. Therefore, only the first variable"
-                           f" '{data_cfg.streamflow_cfg.variables[0]}' will be considered.")
-        return cls(forcings_dl, streamflow_dl, data_cfg.forcings_cfg.variables, data_cfg.streamflow_cfg.variables[0])
+                           f" '{streamflow_cfg.variables[0]}' will be considered.")
+        return cls(forcings_dl, streamflow_dl, forcings_cfg.variables, streamflow_cfg.variables[0])
 
     @property
     def forcings_variables(self):

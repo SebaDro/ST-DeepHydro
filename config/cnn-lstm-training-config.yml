@@ -1,14 +1,14 @@
 data:
   basinsFile: "./config/basins.txt"
   forcings:
-    dir: "./data/forcings"
-    type: "daymet"
-    variables:
-      - "prcp"
-      - "tmin"
-      - "tmax"
-      - "srad"
-      - "vp"
+    - dir: "./data/forcings"
+      type: "daymet"
+      variables:
+        - "prcp"
+        - "tmin"
+        - "tmax"
+        - "srad"
+        - "vp"
   streamflow:
     dir: "./data/streamflow"
     type: "camels-us"
@@ -25,7 +25,8 @@ data:
     endDate: "2014-12-31"
 model:
   type: "cnn-lstm"
-  timesteps: 20
+  timesteps:
+    - 20
   offset: 1
   loss:
     - "mse"

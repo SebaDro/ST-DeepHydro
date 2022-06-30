@@ -1,11 +1,11 @@
 data:
   basinsFile: "./config/basins.txt"
   forcings:
-    dir: "./data/forcings"
-    type: "camels-us"
-    variables:
-      - "prcp(mm/day)"
-      - "srad(W/m2)"
+    - dir: "./data/forcings"
+      type: "camels-us"
+      variables:
+        - "prcp(mm/day)"
+        - "srad(W/m2)"
   streamflow:
     dir: "./data/streamflow"
     type: "camels-us"
@@ -22,7 +22,8 @@ data:
     endDate: "2014-12-31"
 model:
   type: "lstm"
-  timesteps: 20
+  timesteps:
+    - 20
   offset: 1
   loss:
     - "mse"
@@ -43,6 +44,7 @@ model:
         - 0.1
         - 0
 general:
+  logTensorboardEvents: true
   name: "lstm"
   outputDir: "./output"
   saveModel: true
