@@ -432,7 +432,7 @@ def create_out_dir(output: str, name: str) -> str:
 
     """
     timestamp = dt.datetime.now().strftime("%Y%m%d%H%M%S%z")
-    out_dir = os.path.join(output, f"{timestamp}_{name}")
+    out_dir = os.path.join(output, f"{name}_{timestamp}")
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
         logger.info(f"Created directory {out_dir} for storing outputs.")
