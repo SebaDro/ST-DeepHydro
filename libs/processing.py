@@ -52,8 +52,17 @@ def merge_observations_and_predictions(ds_observation: xr.Dataset, ds_prediction
 
 
 class AbstractProcessor:
-    def __init__(self, scaling_params: tuple = None):
+    def __init__(self, feature_cols: list = None, scaling_params: tuple = None):
+        self.__feature_cols = feature_cols
         self.__scaling_params = scaling_params
+
+    @property
+    def feature_cols(self):
+        return self.__feature_cols
+
+    @feature_cols.setter
+    def feature_cols(self, value):
+        self.__feature_cols = value
 
     @property
     def scaling_params(self):
@@ -94,19 +103,30 @@ class AbstractProcessor:
         min_params, max_params = self.scaling_params
         return ds * (max_params - min_params) + min_params
 
+    def fillna(self, ds: xr.Dataset, value: int):
+        ds[self.feature_cols] = ds[self.feature_cols].fillna(-1)
+        return ds
+
+    def setna(self, ds: xr.Dataset, value: int):
+        for f in self.feature_cols:
+            ds[f] = ds[f].where(ds[f] != value)
+        return ds
+
 
 class DefaultDatasetProcessor(AbstractProcessor):
-    def __init__(self, scaling_params: tuple = None):
+    def __init__(self, feature_cols: list = None, scaling_params: tuple = None):
         """
         Initializes a DefaultDatasetProcessor instance that peforms several default processing steps on timeseries data
         wrapped by a dataset.AbstractDataset instance.
 
         Parameters
         ----------
+        feature_cols: list
+            List of feature column/variable names
         scaling_params: tuple
             Parameters that should be used for performing min-max-sacling on the timeseries data.
         """
-        super().__init__(scaling_params)
+        super().__init__(feature_cols, scaling_params)
 
     def fit(self, ds: dataset.HydroDataset):
         """
@@ -125,6 +145,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
 
         """
         self.__fit_scaling_params(ds)
+        self.feature_cols = ds.feature_cols
 
     def process(self, ds: dataset.HydroDataset):
         """
@@ -152,6 +173,7 @@ class DefaultDatasetProcessor(AbstractProcessor):
             self.__fit_scaling_params(ds)
         ds = copy.copy(ds)
         ds.timeseries = self.scale(ds.timeseries)
+        ds.timeseries = self.fillna(ds.timeseries, -1)
         return ds
 
     def __fit_scaling_params(self, ds: dataset.HydroDataset):

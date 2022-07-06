@@ -28,6 +28,9 @@ def create_forcings_data():
     dates = pd.date_range("2021", periods=20)
     temp_values = np.random.uniform(low=0, high=10, size=(20,))
     prcp_values = np.random.uniform(low=0, high=10, size=(20,))
+    na_indices = [3, 4, 9, 15]
+    temp_values[na_indices] = np.NaN
+    prcp_values[na_indices] = np.NaN
 
     df = pd.DataFrame({"temp": temp_values, "prcp": prcp_values}, index=dates)
     return df
@@ -131,3 +134,13 @@ class TestDefaultDatasetProcessor(unittest.TestCase):
 
         streamflow_max_exp = (max_streamflow - min_streamflow_fit) / (max_streamflow_fit - min_streamflow_fit)
         self.assertEqual(streamflow_max_exp, self.__dataset.timeseries.streamflow.max().values)
+
+    def test_fillna(self):
+        processor = processing.DefaultDatasetProcessor()
+        processor.feature_cols = ["temp", "prcp"]
+
+        self.__dataset.timeseries = processor.fillna(self.__dataset.timeseries, -1)
+        self.assertEqual(-1, self.__dataset.timeseries.prcp.values[3])
+
+        self.__dataset.timeseries = processor.setna(self.__dataset.timeseries, -1)
+        self.assertTrue(np.isnan(self.__dataset.timeseries.prcp.values[3]))
