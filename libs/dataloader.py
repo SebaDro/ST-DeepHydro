@@ -282,7 +282,7 @@ class DaymetDataLoader(AbstractDatasetLoader):
         return ds_forcings
 
     def _discover_and_load_xarray_dataset(self, start_date: str, end_date: str, basin: str) -> xr.Dataset:
-        forcings_path = ioutils.discover_single_file_for_basin(self.data_dir, basin)
+        forcings_path = ioutils.discover_single_daymet_file_for_basin(self.data_dir, basin)
         return self._load_xarray_dataset(forcings_path, start_date, end_date, basin)
 
     def _load_xarray_dataset(self, path: str, start_date: str, end_date: str, basin: str = None) -> xr.Dataset:

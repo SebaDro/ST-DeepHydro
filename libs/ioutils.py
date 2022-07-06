@@ -60,6 +60,36 @@ def discover_files_for_basins(data_dir: str, basins: list) -> list:
     return [discover_single_file_for_basin(data_dir, b) for b in basins]
 
 
+def discover_single_daymet_file_for_basin(data_dir: str, basin: str) -> str:
+    """
+    Discovers a single Daymet NetCDF file for the specified basin. Discovery will be performed using the pattern
+    '{data_dir}/*{basin}*.nc', i.e. the basin ID has to be present in any file name within the directory. Note, that
+    basin id '123' e.g. will match the following file names: 123.nc, 00123456_daymet_v4_daily_na.nc. Be sure, that your
+    file names are unique, otherwise only the first occurence will be returned.
+
+    Parameters
+    ----------
+    data_dir: str
+        The data directory used for discovering a dataset file related to the specified basin
+    basin: str
+        ID of the basin
+
+    Returns
+    -------
+    str
+        Path of the file, which is related to the specified basin
+
+    """
+    # TODO Think about more sophisticated file discovery using regex, such as (?<![0-9])basin(?![0-9])
+    files = glob.glob(f"{data_dir}/**/*{basin}*.nc", recursive=True)
+    if len(files) == 0:
+        raise FileNotFoundError(f"Can't find file for basin {basin} within directory {data_dir}.")
+    if len(files) > 1:
+        logger.warning(f"Found multiple files for basin {basin} within directory {data_dir}. "
+                       f"First one found will be returned.")
+    return files[0]
+
+
 def discover_daymet_files(root_data_dir: str, variables: list):
     """
     Discovers all Daymet NetCDF files from a root directory for given variables.
