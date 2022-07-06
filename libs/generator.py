@@ -34,7 +34,7 @@ class CustomTimeseriesGenerator(Sequence):
         n-days will be taken as input and the the streamflow for n + 1 will be taken as target.
     feature_vars: list
         List of variables that should be used as input features
-    target_var: list
+    target_var: str
         List of variables that should be used as targets
     drop_na: bool
         Indicates whether NaN values for the target vars should be preserved for generating time win or not.
@@ -50,7 +50,7 @@ class CustomTimeseriesGenerator(Sequence):
 
     def __init__(self, xds: Union[xr.Dataset, List[xr.Dataset]], batch_size: int, timesteps: Union[int, List[int]],
                  offset: int, feature_vars: list, target_var: str, drop_na: bool = True, joined_features: bool = False,
-                 input_shape: tuple = None):
+                 shuffle: bool = False, input_shape: tuple = None):
         self.xds_list = []
         self.ds_inputs_list = []
         if isinstance(xds, xr.Dataset):
@@ -67,12 +67,15 @@ class CustomTimeseriesGenerator(Sequence):
         self.drop_na = drop_na
         self.joined_features = joined_features
         self.input_shape = input_shape
+        self.shuffle = shuffle
 
         for x in xds:
             self.xds_list.append(self.__check_coords(x))
             self.ds_inputs_list.append(x[feature_vars].to_array().values)
         self.ds_targets = self.xds_list[0][[target_var]].to_array().values
         self.idx_dict = self.__get_idx_df(drop_na, joined_features)
+        if self.shuffle:
+            self.idx_dict = self.idx_dict.sample(frac=1).reset_index(drop=True)
 
     def __check_coords(self, xds: xr.Dataset):
         if all(i in xds.coords for i in ["basin", "time", "y", "x"]):
@@ -151,3 +154,7 @@ class CustomTimeseriesGenerator(Sequence):
             dim_size = tuple(xds[dim].size for dim in dim_indices)
             shapes.append((0, self.timesteps_list[i]) + dim_size + (len(self.feature_vars),))
         return shapes
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            self.idx_dict = self.idx_dict.sample(frac=1).reset_index(drop=True)

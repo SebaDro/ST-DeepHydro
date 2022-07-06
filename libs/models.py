@@ -82,8 +82,8 @@ class AbstractModel:
                              optimizer=self._config.optimizer,
                              metrics=self._config.metrics)
 
-        training_gen = self.__create_timeseries_generator(training_ds_list)
-        validation_gen = self.__create_timeseries_generator(validation_ds_list)
+        training_gen = self.__create_timeseries_generator(training_ds_list, True, True)
+        validation_gen = self.__create_timeseries_generator(validation_ds_list, True, True)
 
         callbacks = monitor.get_callbacks() if monitor is not None else None
 
@@ -114,7 +114,7 @@ class AbstractModel:
             Evaluation metric either as dictionary or as basin indexed xarray.Dataset
 
         """
-        test_gen = self.__create_timeseries_generator(test_ds_list)
+        test_gen = self.__create_timeseries_generator(test_ds_list, True, False)
         result = self.__model.evaluate(test_gen, return_dict=True)
         if as_dataset and basin is not None:
             res_dict = {}
@@ -145,7 +145,7 @@ class AbstractModel:
             Model predictions
 
         """
-        gen = self.__create_timeseries_generator(ds_list, remove_nan)
+        gen = self.__create_timeseries_generator(ds_list, remove_nan, False)
         predictions = self.__model.predict(gen)
         if as_dataset:
             return self.prediction_to_dataset(ds_list[0], predictions, basin, remove_nan)
@@ -213,18 +213,19 @@ class AbstractModel:
         self.model.save(storage_path)
         return storage_path
 
-    def __create_timeseries_generator(self, ds_list: List[dataset.HydroDataset], remove_nan: bool = True):
+    def __create_timeseries_generator(self, ds_list: List[dataset.HydroDataset], remove_nan: bool = True,
+                                      shuffle: bool = False):
         feature_cols = ds_list[0].feature_cols
         target_col = ds_list[0].target_col
         timeseries = [ds.timeseries for ds in ds_list]
         if self._config.multi_output:
             return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
                                                        self._config.offset, feature_cols, target_col,
-                                                       remove_nan, True)
+                                                       remove_nan, True, shuffle)
         else:
             return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
                                                        self._config.offset, feature_cols, target_col,
-                                                       remove_nan, False)
+                                                       remove_nan, False, shuffle)
 
 
 class LstmModel(AbstractModel):
@@ -340,40 +341,91 @@ class CnnLstmModel(AbstractModel):
 class MultiInputCnnLstmModel(AbstractModel):
 
     def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None):
-        input_1 = tf.keras.layers.Input(shape=input_shape[0])
-        lstm_1 = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(input_1)
-        lstm_2 = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(lstm_1)
+        hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout = params
+
+        input_lstm = tf.keras.layers.Input(shape=input_shape[0])
+        x_lstm = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(input_lstm)
+        x_lstm = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(x_lstm)
+        # x_lstm = tf.keras.layers.LSTM(64, return_sequences=False, dropout=0.1, use_bias=True)(input_lstm)
 
         # CNN-LSTM
-        input_2 = tf.keras.layers.Input(shape=input_shape[1])
+        input_cnn = tf.keras.layers.Input(shape=input_shape[1])
         conv2d_1 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(8, (3, 3), activation="relu", padding="same"))(
-            input_2)
+            tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same"))(input_cnn)
         maxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_1)
         conv2d_2 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same"))(
+            tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
             maxpooling_1)
         maxpooling_2 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_2)
         conv2d_3 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
+            tf.keras.layers.Conv2D(64, (3, 3), activation="relu", padding="same"))(
             maxpooling_2)
+        # maxpooling_3 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_3)
+        # conv2d_4 = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
+        #     maxpooling_3)
         globalmaxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D())(conv2d_3)
         cnn_lstm_1 = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(globalmaxpooling_1)
         cnn_lstm_2 = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(cnn_lstm_1)
+        # cnn_lstm_2 = tf.keras.layers.LSTM(64, return_sequences=False, dropout=0.1, use_bias=True)(globalmaxpooling_1)
 
         # Concatenate
-        concat = tf.keras.layers.concatenate([lstm_2, cnn_lstm_2])
+        concat = tf.keras.layers.concatenate([x_lstm, cnn_lstm_2])
 
         # Output
         dense_1 = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)(concat)
+        # output = tf.keras.layers.Dense(1)(concat)
         output = tf.keras.layers.Dense(1)(dense_1)
 
         # Full model
-        model = tf.keras.Model(inputs=[input_1, input_2], outputs=output)
+        model = tf.keras.Model(inputs=[input_lstm, input_cnn], outputs=output)
         return model
 
+    def __get_and_validate_lstm_params(self, params: dict):
+        try:
+            hidden_layers = params["hiddenLayers"]
+            units = params["units"]
+            if not isinstance(hidden_layers, int):
+                raise config.ConfigError(
+                    f"Wrong type of 'hiddenLayers' parameter: {type(hidden_layers)}. Expected: 'int'")
+            if hidden_layers < 0:
+                raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
+            if len(units) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(units)}. Expected: {hidden_layers}")
+            dropout = params["dropout"]
+            if len(dropout) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of dropout definitions: {len(dropout)}. Expected: {hidden_layers}")
+            return hidden_layers, units, dropout
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
+    def __get_and_validate_cnn_params(self, params: dict):
+        try:
+            hidden_layers = params["hiddenLayers"]
+            filters = params["filters"]
+            if not isinstance(hidden_layers, int):
+                raise config.ConfigError(
+                    f"Wrong type of 'hiddenLayers' parameter: {type(hidden_layers)}. Expected: 'int'")
+            if hidden_layers < 0:
+                raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
+            if len(filters) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(filters)}. Expected: {hidden_layers}")
+            return hidden_layers, filters
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
     def _get_and_validate_params(self, params: dict):
-        pass
+        try:
+            cnn_params = params["cnn"]
+            hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
+            lstm_params = params["lstm"]
+            hidden_lstm_layers, units, dropout = self.__get_and_validate_lstm_params(lstm_params)
+            return hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
 
 class ConvLstmModel(AbstractModel):
