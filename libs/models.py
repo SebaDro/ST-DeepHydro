@@ -341,40 +341,41 @@ class CnnLstmModel(AbstractModel):
 class MultiInputCnnLstmModel(AbstractModel):
 
     def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None):
-        hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout = params
+        hidden_cnn_layers, filters, hidden_lstm_layers, lstm_units, lstm_dropout = params
 
+        # LSTM layers
         input_lstm = tf.keras.layers.Input(shape=input_shape[0])
-        x_lstm = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(input_lstm)
-        x_lstm = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(x_lstm)
-        # x_lstm = tf.keras.layers.LSTM(64, return_sequences=False, dropout=0.1, use_bias=True)(input_lstm)
+        x_lstm = input_lstm
+        for i in range(0, hidden_lstm_layers - 1):
+            x_lstm = tf.keras.layers.LSTM(lstm_units[i], return_sequences=True, dropout=lstm_dropout[i],
+                                          use_bias=True)(x_lstm)
+        x_lstm = tf.keras.layers.LSTM(lstm_units[hidden_lstm_layers - 1], return_sequences=False,
+                                      dropout=lstm_dropout[hidden_lstm_layers - 1], use_bias=True)(x_lstm)
 
-        # CNN-LSTM
+        # CNN layers
         input_cnn = tf.keras.layers.Input(shape=input_shape[1])
-        conv2d_1 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(16, (3, 3), activation="relu", padding="same"))(input_cnn)
-        maxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_1)
-        conv2d_2 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
-            maxpooling_1)
-        maxpooling_2 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_2)
-        conv2d_3 = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Conv2D(64, (3, 3), activation="relu", padding="same"))(
-            maxpooling_2)
-        # maxpooling_3 = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_3)
-        # conv2d_4 = tf.keras.layers.TimeDistributed(
-        #     tf.keras.layers.Conv2D(32, (3, 3), activation="relu", padding="same"))(
-        #     maxpooling_3)
-        globalmaxpooling_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D())(conv2d_3)
-        cnn_lstm_1 = tf.keras.layers.LSTM(32, return_sequences=True, dropout=0.1, use_bias=True)(globalmaxpooling_1)
-        cnn_lstm_2 = tf.keras.layers.LSTM(32, return_sequences=False, use_bias=True)(cnn_lstm_1)
-        # cnn_lstm_2 = tf.keras.layers.LSTM(64, return_sequences=False, dropout=0.1, use_bias=True)(globalmaxpooling_1)
+        conv2d_x = input_cnn
+        for i in range(0, hidden_cnn_layers - 1):
+            conv2d_x = tf.keras.layers.TimeDistributed(
+                tf.keras.layers.Conv2D(filters[i], (3, 3), activation="relu", padding="same"))(conv2d_x)
+            conv2d_x = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2)))(conv2d_x)
+
+        conv2d_x = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Conv2D(filters[hidden_cnn_layers - 1], (3, 3), activation="relu", padding="same"))(conv2d_x)
+        conv2d_x = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalMaxPooling2D())(conv2d_x)
+
+        # CNN-LSTM layers
+        cnn_lstm_x = conv2d_x
+        for i in range(0, hidden_lstm_layers - 1):
+            cnn_lstm_x = tf.keras.layers.LSTM(lstm_units[i], return_sequences=True, dropout=lstm_dropout[i], use_bias=True)(cnn_lstm_x)
+        cnn_lstm_x = tf.keras.layers.LSTM(lstm_units[hidden_lstm_layers - 1], return_sequences=False,
+                                          dropout=lstm_dropout[hidden_lstm_layers - 1], use_bias=True)(cnn_lstm_x)
 
         # Concatenate
-        concat = tf.keras.layers.concatenate([x_lstm, cnn_lstm_2])
+        concat = tf.keras.layers.concatenate([x_lstm, cnn_lstm_x])
 
         # Output
         dense_1 = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)(concat)
-        # output = tf.keras.layers.Dense(1)(concat)
         output = tf.keras.layers.Dense(1)(dense_1)
 
         # Full model
