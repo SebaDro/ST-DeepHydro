@@ -12,8 +12,25 @@ from libs import monitoring
 
 
 class AbstractModel:
+    """
+    Abstract base model class used for subclassing different model implementations based on Tensorflow.
+
+    This class implements various common operations when dealing with Tensorflow models such as building, compiling and
+    fitting as well as evaluating and predicting. For building custom models, just inherit this abstract class and
+    implement `_build_model` and `_get_and_validate_params`. `_build_model` should build a Tensorflow model
+    architecture while `_get_and_validate_params` checks `config.ModelConfig` for certain model configuration parameters
+    that are required for constructing the Tensorflow model.
+    """
 
     def __init__(self, cfg: config.ModelConfig):
+        """
+        Creates a new model with the given model configuration parameters
+
+        Parameters
+        ----------
+        cfg: config.ModelConfig
+            Parameters used to configure building and training of the model
+        """
         self.__model = None
         self.__history = None
         self.__eval_results = None
@@ -51,10 +68,10 @@ class AbstractModel:
         param_tuple = self._get_and_validate_params(self._config.params)
         self.__model = self._build_model(input_shape, param_tuple, output_size)
 
-    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size):
+    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size) -> tf.keras.Model :
         raise NotImplementedError
 
-    def _get_and_validate_params(self, params: dict):
+    def _get_and_validate_params(self, params: dict) -> tuple:
         raise NotImplementedError
 
     def compile_and_fit(self, training_ds_list: List[dataset.HydroDataset],
@@ -66,10 +83,10 @@ class AbstractModel:
 
         Parameters
         ----------
-        training_ds: dataset.HydroDataset
-            Dataset that will be used for training
-        validation_ds: dataset.HydroDataset
-            Dataset that will be used for validation
+        training_ds_list: List of dataset.HydroDataset
+            One or more datasets that will be used as input(s) for model training
+        validation_ds_list: List of dataset.HydroDataset
+            One or more datasets that will be used as input(s) for model validation
         monitor: monitoring.TrainingMonitor
             Encapsulates Tensorflow callback objects used for monitoring training progress
         Returns
@@ -100,8 +117,8 @@ class AbstractModel:
 
         Parameters
         ----------
-        test_ds: dataset.HydroDataset
-            Input dataset for model evaluation
+        test_ds_list: List of dataset.HydroDataset
+            One or more datasets that wil be used as input(s) for model evaluation
         as_dataset: bool
             Indicates whether the calculated evaluation metrics should be returned as raw value or as xarray.Dataset
             indexed by the basin ID.
@@ -130,8 +147,8 @@ class AbstractModel:
 
         Parameters
         ----------
-        ds: dataset.HydroDataset
-            Input dataset for model predictions
+        ds_list: dataset.HydroDataset
+            One or more datasets that will be used as input(s) for model predictions
         basin: str
             Basin ID
         as_dataset: bool
@@ -229,8 +246,35 @@ class AbstractModel:
 
 
 class LstmModel(AbstractModel):
+    """
+    This class builds a vanilla LSTM Tensorflow model.
 
-    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None):
+    The Tensorflow model comprises one or more stacked (hidden) LSTM layers with a fully connected layer on top for
+    predicting one or more target variables from timeseries inputs. Various configurable model parameters, such as the
+    number of stacked layers, dropout rate and size of hidden units define the model architecture.
+
+    """
+
+    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None) -> tf.keras.Model:
+        """
+        Builds a simple Tensorflow model with multiple stacked LSTM layers and a fully connected layer on top. The model
+        architecture depends on passed model parameters.
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs without sample axis
+        params: tuple
+            Specific model parameters
+        output_size: int
+            (optional) Output size
+
+        Returns
+        -------
+        tf.keras.Model
+            A Tensorflow based LSTM model
+
+        """
         hidden_layers, units, dropout = params
 
         model = tf.keras.Sequential()
@@ -244,7 +288,7 @@ class LstmModel(AbstractModel):
             model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
-    def _get_and_validate_params(self, params: dict):
+    def _get_and_validate_params(self, params: dict) -> tuple:
         try:
             params = params["lstm"]
             hidden_layers = params["hiddenLayers"]
@@ -262,8 +306,43 @@ class LstmModel(AbstractModel):
 
 
 class CnnLstmModel(AbstractModel):
+    """
+    The CnnLstmModel class builds a combination of Convolutional Neural Network (CNN) and Long short-term memory (LSTM)
+    Tensorflow model.
 
-    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None):
+    The model comprises a combination of CNN and LSTM layers to process spatially distributed timeseries data. The idea
+    of this model architecture is to extract features from a timeseries of 2-dimensional raster data by convolutional
+    operations at first. The extracted timeseries features then are passed to a stack of LSTM layer to predict one
+    or more target variables
+
+    """
+
+    def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None) -> tf.keras.Model:
+        """
+        Builds a Tensorflow models that comprises a combination of CNN and LSTM layers
+
+        A stack of Conv2D and MaxPooling2D layers is used to process 2-dimensional raster data, which also have a time
+        dimension. Therefore, each Conv2D and MaxPooling2D layer is embedded within a TimeDistributed layer, to apply
+        convolutional and max pooling operations on each temporal slice separately. A GlobalMaxPooling2D layer on top
+        applies a global max pooling operation on each feature map. The output of the CNN part consists of flattened
+        timeseries features, which are subsequently passed to a stack of LSTM layers with a fully connected layer on top
+        to predict one or more target variables.
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs without sample axis
+        params: tuple
+            Specific model parameters
+        output_size: int
+            (optional) Output size
+
+        Returns
+        -------
+        tf.keras.Model
+            A Tensorflow based CNN-LSTM model
+
+        """
         hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout = params
 
         model = tf.keras.models.Sequential([
@@ -327,7 +406,7 @@ class CnnLstmModel(AbstractModel):
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
-    def _get_and_validate_params(self, params: dict):
+    def _get_and_validate_params(self, params: dict) -> tuple:
         try:
             cnn_params = params["cnn"]
             hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
@@ -339,8 +418,49 @@ class CnnLstmModel(AbstractModel):
 
 
 class MultiInputCnnLstmModel(AbstractModel):
+    """
+    The MultiInputCnnLstmModel class concatenates a combination of Convolutional Neural Network (CNN) and
+    Long short-term memory (LSTM), CNN-LSTM, with a classical LSTM Tensorflow model. Therefore, it uses the Tensorflow
 
-    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None):
+    The model comprises a combination of CNN-LSTM and LSTM models to process two input datasets that differ in its
+    spatio-temporal dimensions. The idea of this model is to enhance the capability of a classical LSTM model to predict
+    target variables from one-dimensional timeseries data by also considering spatial distributed timeseries data
+    that are processed by a CNN-LSTM part of the model. That enables feeding the model with long term one-dimensional
+    timeseries data as well as short-term two-dimensional (raster) timeseries data. This approach adds enhanced
+    spatial information to the model and limits computational efforts for training the model at the same time.
+
+    """
+
+    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None) -> tf.keras.Model:
+        """
+        Builds a Tensorflow models that comprises a combination of CNN and LSTM layers
+
+        The classical LSTM part takes one-dimensional timeseries data as inputs and comprises multiple stacked LSTM layers.
+
+        The CNN-LSTM part takes two-dimensional (raster) timeseries data as inputs. A stack of Conv2D and MaxPooling2D
+        is embedded within a TimeDistributed layer, to apply convolutional and max pooling operations on each temporal
+        slice separately. A GlobalMaxPooling2D layer on top applies a global max pooling operation on each feature map.
+        The output of the CNN part consists of flattened timeseries features, which are subsequently passed to a stack
+        of LSTM layers.
+
+        Finally, the LSTM and CNN-LSTM parts are concatenated to apply dense layers on their outputs in order to
+        predict one or more target variables
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs without sample axis
+        params: tuple
+            Specific model parameters
+        output_size: int
+            (optional) Output size
+
+        Returns
+        -------
+        tf.keras.Model
+            A Tensorflow based multi input CNN-LSTM model
+
+        """
         hidden_cnn_layers, filters, hidden_lstm_layers, lstm_units, lstm_dropout = params
 
         # LSTM layers
@@ -418,7 +538,7 @@ class MultiInputCnnLstmModel(AbstractModel):
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
-    def _get_and_validate_params(self, params: dict):
+    def _get_and_validate_params(self, params: dict) -> tuple:
         try:
             cnn_params = params["cnn"]
             hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
@@ -430,8 +550,38 @@ class MultiInputCnnLstmModel(AbstractModel):
 
 
 class ConvLstmModel(AbstractModel):
+    """
+    The ConvLstmModel class builds ConvLSTM Tensorflow model.
 
-    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
+    The ConvLSTM model is able to predict one or more target variables based on spatially distributed timeseries data.
+    The idea of this model is to process timeseries of raster data with a stack of LSTM layers that perform
+    convolutional operations by using input-to-state and state-to-state transitions.
+
+    """
+
+    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None) -> tf.keras.Model:
+        """
+        Builds a Tensorflow model with multiple stacked ConvLSTM2D layers. These layers apply convolutional operations
+        on raster data, which also have a time dimension, to output feature maps for predicting the future state of
+        one or more variables. A global max pooling operation is applied on top of the ConvLSTM2D layers, to flatten the
+        feature maps, which finally are passed to a fully connected layer to predict one or more target variables.
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs without sample axis
+        params: tuple
+            Specific model parameters
+        output_size: int
+            (optional) Output size
+
+        Returns
+        -------
+        tf.keras.Model
+            A Tensorflow based ConvLSTM model
+
+        """
+
         hidden_cnn_layers, filters = params
 
         model = tf.keras.models.Sequential([
@@ -468,7 +618,7 @@ class ConvLstmModel(AbstractModel):
         except KeyError as ex:
             raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
-    def _get_and_validate_params(self, params: dict):
+    def _get_and_validate_params(self, params: dict) -> tuple:
         try:
             cnn_params = params["cnn"]
             hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
@@ -478,8 +628,36 @@ class ConvLstmModel(AbstractModel):
 
 
 class Conv3DModel(AbstractModel):
+    """
+    This class builds a Conv3D Tensorflow model
 
-    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None):
+    The idea of this model is to process spatially distributed timeseries data by using three-dimensional convolutional
+    operations.
+
+    """
+
+    def _build_model(self, input_shape: tuple, params: dict, output_size: int = None) -> tf.keras.Model:
+        """
+        Builds a Tensorflow model with multiple stacked Conv3D and MaxPooling3D layers which apply convolutional
+        and max pooling operations on the spatial as well as the temporal dimension of the input data. A global max
+        pooling operation reduces the output space, which is used to predict one or more target variables by fully
+        connected layers on top.
+
+        Parameters
+        ----------
+        input_shape: tuple
+            Shape of the model inputs without sample axis
+        params: tuple
+            Specific model parameters
+        output_size: int
+            (optional) Output size
+
+        Returns
+        -------
+        tf.keras.Model
+            A Tensorflow based ConvLSTM model
+
+        """
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
             tf.keras.layers.Conv3D(8, (1, 3, 3), activation="relu", padding="same"),
@@ -495,11 +673,27 @@ class Conv3DModel(AbstractModel):
             model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
-    def _get_and_validate_params(self, params: dict):
-        return None
+    def _get_and_validate_params(self, params: dict) -> tuple:
+        pass
 
 
 def factory(cfg: config.ModelConfig) -> AbstractModel:
+    """
+    Factory method that creates a certain model instance from a model config. Which model will be instantiated depends
+    on the defined model type within tje model config.
+
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model
+
+
+    Returns
+    -------
+    AbstractModel
+        An instance of a subclass of AbstractModel
+
+    """
     if cfg.model_type == "lstm":
         return LstmModel(cfg)
     if cfg.model_type == "cnn-lstm":
