@@ -10,6 +10,11 @@ class ConfigError(Exception):
 
 
 class GeneralConfig:
+    """
+    Holds general configuration parameters that control some runtime configuration parameters
+
+    """
+
     def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events):
         self.__name = name
         self.__output_dir = output_dir
@@ -39,7 +44,22 @@ class GeneralConfig:
 
 
 class DatasetConfig:
+    """
+    Holds parameters that define a dataset timespan
+
+    """
+
     def __init__(self, start_date: str, end_date: str):
+        """
+        Creates a DatasetConfig instance
+
+        Parameters
+        ----------
+        start_date: str
+            Start date string in the format yyyy-MM-dd
+        end_date: str
+            End date string in the format yyyy-MM-dd
+        """
         self.__start_date = start_date
         self.__end_date = end_date
 
@@ -53,7 +73,24 @@ class DatasetConfig:
 
 
 class DataTypeConfig:
+    """
+    Configuration parameters that define a certain dataset type (e.g., CAMELS-US or Daymet)
+
+    """
+
     def __init__(self, data_dir: str, data_type: str, variables: list):
+        """
+        Creates a DataTypeConfig instance
+
+        Parameters
+        ----------
+        data_dir: str
+            Path to the data directory
+        data_type: str
+            Data type. Supported: 'Daymet', 'CAMELS-US'
+        variables
+            List of variable names
+        """
         self.__data_dir = data_dir
         self.__data_type = data_type
         self.__variables = variables
@@ -75,9 +112,28 @@ class DataConfig:
     """
     Holds configuration parameters required for creating training, validation and test datasets from forcings and
     streamflow data.
+
     """
     def __init__(self, basins_file: str, forcings_cfg: List[DataTypeConfig], streamflow_cfg: DataTypeConfig,
                  training_cfg: DatasetConfig, validation_cfg: DatasetConfig, test_cfg: DatasetConfig):
+        """
+        Creates a DataConfig instance
+
+        Parameters
+        ----------
+        basins_file: str
+            Path to basins file
+        forcings_cfg: List of DataTypeConfig
+            Configuration parameters for one or more forcings datasets
+        streamflow_cfg: DataTypeConfig
+            Configuration parameters for forcings data
+        training_cfg: DatasetConfig
+            Configuration parameters for the training dataset
+        validation_cfg: DatasetConfig
+            Configuration parameters for the validation dataset
+        test_cfg: DatasetConfig
+            Configuration parameters for the test dataset
+        """
         self.__basins_file = basins_file
         self.__forcings_cfg = forcings_cfg
         self.__streamflow_cfg = streamflow_cfg
@@ -111,8 +167,40 @@ class DataConfig:
 
 
 class ModelConfig:
+    """
+    Configuration parameters that define the model architecture and control the training process
+
+    """
     def __init__(self, model_type: str, timesteps: Union[int, List[int]], offset: int, loss: list, metrics: list,
                  optimizer: str, epochs: int, batch_size: int, multi_output: bool, params: dict = None):
+        """
+        Creates a new ModelConfig instance
+
+        Parameters
+        ----------
+        model_type: str
+            Type of the model. Supported: 'lstm', 'cnn-lstm', 'multi-cnn-lstm', 'convlstm', 'conv3d'
+        timesteps: List of int
+            Timesteps for each input dataset
+        offset: int:
+            Prediction offset for the target variable(s)
+        loss: List of str
+            List loss functions to use for training
+        metrics: List of str
+            List of metrics for validation and evaluation
+        optimizer: str
+            Optimizer to use for training
+        epochs: int
+            Number of training epochs
+        batch_size: int
+            Batch size to use for training
+        multi_output: bool
+            Indicates whether the model should predict multiple target variables or only one
+        params: dict
+            Additional model specific configuration parameters. E.g., a combined CNN-LSTM models required other
+            config parameter then a simple LSTM model.
+
+        """
         self.__model_type = model_type
         self.__timesteps = timesteps
         self.__offset = offset
@@ -166,7 +254,24 @@ class ModelConfig:
 
 
 class Config:
+    """
+    Wrapper class for configuration parameters
+
+    """
+
     def __init__(self, general_config: GeneralConfig, data_config: DataConfig, model_config: ModelConfig):
+        """
+        Creates a new Config instance
+
+        Parameters
+        ----------
+        general_config: GeneralConfig
+            General configuration parameters
+        data_config: DataConfig
+            Dataset related configuration parameters
+        model_config: ModelConfig
+            Model related configuration parameters
+        """
         self.__general_config = general_config
         self.__data_config = data_config
         self.__model_config = model_config
@@ -208,6 +313,7 @@ class Config:
 
 def create_general_config(cfg: dict) -> GeneralConfig:
     """
+    Creates a GeneralConfig instance from a dictionary
 
     Parameters
     ----------
@@ -226,6 +332,7 @@ def create_general_config(cfg: dict) -> GeneralConfig:
 
 def create_dataset_config(cfg: dict) -> DatasetConfig:
     """
+    Create a DatasetConfig instance from a dictionary
 
     Parameters
     ----------
@@ -243,6 +350,7 @@ def create_dataset_config(cfg: dict) -> DatasetConfig:
 
 def create_dataype_config(cfg: dict) -> DataTypeConfig:
     """
+    Create a DataTypeConfig instance from a dictionary
 
     Parameters
     ----------
@@ -261,7 +369,7 @@ def create_dataype_config(cfg: dict) -> DataTypeConfig:
 
 def create_data_config(cfg: dict) -> DataConfig:
     """
-    Reads parameters from a config dict related to data specific configurations.
+    Create a DataConfig instance from a dictionary
 
     Parameters
     ----------
