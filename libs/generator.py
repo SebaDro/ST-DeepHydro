@@ -5,7 +5,6 @@ from tensorflow.keras.utils import Sequence
 from typing import Union, List
 import xarray as xr
 import logging
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -20,37 +19,40 @@ class CustomTimeseriesGenerator(Sequence):
     number of timesteps. In this case, the first xarray.Dataset from the given list as well as the corresponding will be
     considered as a reference for all other datasets.
 
-    Parameters
-    ----------
-    xds: xarray.Dataset or list of xarray.Dataset
-        One or more Datasets that holds forcings and streamflow timeseries data.
-    batch_size: int
-        Size of the batches that will be created
-    timesteps: int or list of int
-        Timesteps that will be used for creating the input (forcings) timeseries. If you passed a list to the xds
-        parameter, you also have to provide a list  with the same length to this parameter.
-    offset: int
-        Offset between inputs (forcings) and target (streamflow). An offset of 1 means that forcings for the last
-        n-days will be taken as input and the the streamflow for n + 1 will be taken as target.
-    feature_vars: list
-        List of variables that should be used as input features
-    target_var: str
-        List of variables that should be used as targets
-    drop_na: bool
-        Indicates whether NaN values for the target vars should be preserved for generating time win or not.
-        Default: True
-    joined_features: bool
-        Indicates whether the timeseries batches should be prepared in a joined way, meaning input features are
-        valid for all basins. If False, input feature timeseries are basin indexed. Default: False
-    input_shape: tuple
-        Shape of the inputs to be used for generating time windows. If not specified, the input shape will be
-        computed automatically from the given xarray.Dataset.
-
     """
 
     def __init__(self, xds: Union[xr.Dataset, List[xr.Dataset]], batch_size: int, timesteps: Union[int, List[int]],
                  offset: int, feature_vars: list, target_var: str, drop_na: bool = True, joined_features: bool = False,
                  shuffle: bool = False, input_shape: tuple = None):
+        """
+        Creates a CustomTimeseriesGenerator instance
+
+        Parameters
+        ----------
+        xds: xarray.Dataset or list of xarray.Dataset
+            One or more Datasets that holds forcings and streamflow timeseries data.
+        batch_size: int
+            Size of the batches that will be created
+        timesteps: int or list of int
+            Timesteps that will be used for creating the input (forcings) timeseries. If you passed a list to the xds
+            parameter, you also have to provide a list  with the same length to this parameter.
+        offset: int
+            Offset between inputs (forcings) and target (streamflow). An offset of 1 means that forcings for the last
+            n-days will be taken as input and the the streamflow for n + 1 will be taken as target.
+        feature_vars: list
+            List of variables that should be used as input features
+        target_var: str
+            List of variables that should be used as targets
+        drop_na: bool
+            Indicates whether NaN values for the target vars should be preserved for generating time win or not.
+            Default: True
+        joined_features: bool
+            Indicates whether the timeseries batches should be prepared in a joined way, meaning input features are
+            valid for all basins. If False, input feature timeseries are basin indexed. Default: False
+        input_shape: tuple
+            Shape of the inputs to be used for generating time windows. If not specified, the input shape will be
+            computed automatically from the given xarray.Dataset.
+        """
         self.xds_list = []
         self.ds_inputs_list = []
         if isinstance(xds, xr.Dataset):
