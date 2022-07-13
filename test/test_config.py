@@ -1,5 +1,5 @@
 import unittest
-from libs import config
+from stdeephydro import config
 
 
 class TestDaymet(unittest.TestCase):

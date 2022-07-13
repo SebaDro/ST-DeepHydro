@@ -1,6 +1,6 @@
 import tensorflow as tf
 import os
-from libs import config
+from stdeephydro import config
 
 
 class TrainingMonitor:

@@ -1,14 +1,14 @@
 import logging
 import os
 
-from libs import common
-from libs import config
-from libs import ioutils
-from libs import models
-from libs import monitoring
-from libs import processing
-from libs import evaluation
-from libs import dataloader
+from stdeephydro import common
+from stdeephydro import config
+from stdeephydro import ioutils
+from stdeephydro import models
+from stdeephydro import monitoring
+from stdeephydro import processing
+from stdeephydro import evaluation
+from stdeephydro import dataloader
 from typing import List
 
 

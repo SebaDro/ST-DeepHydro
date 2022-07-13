@@ -2,9 +2,9 @@ import logging
 import pandas as pd
 import xarray as xr
 
-from libs import config
-from libs import dataset
-from libs import ioutils
+from stdeephydro import config
+from stdeephydro import dataset
+from stdeephydro import ioutils
 
 logger = logging.getLogger(__name__)
 

@@ -5,10 +5,10 @@ import os
 import tensorflow as tf
 import xarray as xr
 from typing import Union, List
-from libs import config
-from libs import dataset
-from libs import generator
-from libs import monitoring
+from stdeephydro import config
+from stdeephydro import dataset
+from stdeephydro import generator
+from stdeephydro import monitoring
 
 
 class AbstractModel:

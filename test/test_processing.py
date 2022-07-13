@@ -1,5 +1,5 @@
-from libs import dataset
-from libs import processing
+from stdeephydro import dataset
+from stdeephydro import processing
 import unittest
 import pandas as pd
 import numpy as np

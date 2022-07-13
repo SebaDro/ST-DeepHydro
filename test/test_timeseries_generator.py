@@ -4,8 +4,8 @@ import pandas as pd
 import unittest
 import xarray as xr
 
-from libs import dataset
-from libs import generator
+from stdeephydro import dataset
+from stdeephydro import generator
 
 
 def create_streamflow_data():

@@ -3,7 +3,7 @@ import os
 import xarray as xr
 from typing import Union
 
-from libs import processing
+from stdeephydro import processing
 
 logger = logging.getLogger(__name__)
 

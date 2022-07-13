@@ -2,7 +2,7 @@ import copy
 import logging
 import xarray as xr
 
-from libs import dataset
+from stdeephydro import dataset
 
 logger = logging.getLogger(__name__)
 
