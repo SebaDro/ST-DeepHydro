@@ -234,13 +234,13 @@ class AbstractModel:
         target_col = ds_list[0].target_col
         timeseries = [ds.timeseries for ds in ds_list]
         if self._config.multi_output:
-            return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, feature_cols, target_col,
-                                                       remove_nan, True, shuffle)
+            return generator.HydroMeteorologicalTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
+                                                                    self._config.offset, feature_cols, target_col,
+                                                                    remove_nan, True, shuffle)
         else:
-            return generator.CustomTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
-                                                       self._config.offset, feature_cols, target_col,
-                                                       remove_nan, False, shuffle)
+            return generator.HydroMeteorologicalTimeseriesGenerator(timeseries, self._config.batch_size, self._config.timesteps,
+                                                                    self._config.offset, feature_cols, target_col,
+                                                                    remove_nan, False, shuffle)
 
 
 class LstmModel(AbstractModel):

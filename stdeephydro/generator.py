@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class CustomTimeseriesGenerator(Sequence):
+class HydroMeteorologicalTimeseriesGenerator(Sequence):
     """
     A custom TimeseriesGenerator that creates batches of timeseries windows for input and target variables from a
     xarray.Dataset. The generator optionally takes into account ignoring NaN values.
