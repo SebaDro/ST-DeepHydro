@@ -90,7 +90,7 @@ def create_two_dimensional_joined_dataset():
                                 feature_variables=["temp", "prcp"], target_variable=["streamflow"])
 
 
-class TestCustomTimeseriesGenerator(unittest.TestCase):
+class TestHydroMeteorologicalTimeseriesGenerator(unittest.TestCase):
     def setUp(self):
         self.basin_1 = "123"
         self.basin_2 = "456"
@@ -105,8 +105,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_col = "streamflow"
 
-        gen = generator.CustomTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, False)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, False)
         exp_shape = (0, 8, 2)
         self.assertEqual(exp_shape, gen._get_input_shapes()[0])
 
@@ -117,8 +117,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         feature_cols = ["temp", "prcp"]
         target_col = "streamflow"
 
-        gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, False)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, False)
         exp_shape = (0, 6, 12, 14, 2)
         self.assertEqual(exp_shape, gen._get_input_shapes()[0])
 
@@ -131,8 +131,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         lag = timesteps + offset - 1
 
-        gen = generator.CustomTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, False)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, False)
 
         # First, check the number of batches
         # Substract time lag values from 20 timesteps for each of two basins
@@ -192,8 +192,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the first two batches contains only inputs and targets for basin 1 and the other two batches
         # for basin 2
-        gen = generator.CustomTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, True)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, True)
 
         # First, check the number of batches
         # Substract time lag and 4 NaN values from 20 timesteps for each of two basins
@@ -257,8 +257,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
         shape = (
         timesteps, len(self.ds_2d.timeseries.indexes["y"]), len(self.ds_2d.timeseries.indexes["x"]), len(feature_cols))
 
-        gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, False, False, shape)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, False, False, False, shape)
 
         # First, check the number of batches
         # Substract time lag from 20 timesteps for only one basin
@@ -318,8 +318,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the number of batches is lower
-        gen = generator.CustomTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
-                                                  target_col, True, False, shape)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds_2d.timeseries, batch_size, timesteps, offset, feature_cols,
+                                                               target_col, True, False, False, shape)
 
         # First, check the number of batches
         # Substract time lag and 4 NaN values from 20 timesteps
@@ -378,8 +378,8 @@ class TestCustomTimeseriesGenerator(unittest.TestCase):
 
         # Note that the generator does not consider create input/target pairs for targets with NaN values.
         # As a result the number of batches is lower
-        gen = generator.CustomTimeseriesGenerator(self.ds_2d_joined.timeseries, batch_size, timesteps, offset,
-                                                  feature_cols, target_col, True, True, shape)
+        gen = generator.HydroMeteorologicalTimeseriesGenerator(self.ds_2d_joined.timeseries, batch_size, timesteps, offset,
+                                                               feature_cols, target_col, True, True, False, shape)
 
         # First, check the number of batches
         # Substract time lag and 4 NaN values from 20 timesteps
