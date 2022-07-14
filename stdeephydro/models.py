@@ -18,17 +18,14 @@ class AbstractModel:
     implement `_build_model` and `_get_and_validate_params`. `_build_model` should build a Tensorflow model
     architecture while `_get_and_validate_params` checks `config.ModelConfig` for certain model configuration parameters
     that are required for constructing the Tensorflow model.
+
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model
     """
 
     def __init__(self, cfg: config.ModelConfig):
-        """
-        Creates a new model with the given model configuration parameters
-
-        Parameters
-        ----------
-        cfg: config.ModelConfig
-            Parameters used to configure building and training of the model
-        """
         self.__model = None
         self.__history = None
         self.__eval_results = None
@@ -66,7 +63,7 @@ class AbstractModel:
         param_tuple = self._get_and_validate_params(self._config.params)
         self.__model = self._build_model(input_shape, param_tuple, output_size)
 
-    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size) -> tf.keras.Model :
+    def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size) -> tf.keras.Model:
         raise NotImplementedError
 
     def _get_and_validate_params(self, params: dict) -> tuple:
@@ -141,12 +138,12 @@ class AbstractModel:
 
     def predict(self, ds_list: List[dataset.HydroDataset], basin: str, as_dataset: bool = True, remove_nan: bool = False):
         """
-        Uses the trained model the calculate predictions for the given dataset.
+        Uses the trained model to calculate predictions for the given dataset.
 
         Parameters
         ----------
         ds_list: dataset.HydroDataset
-            One or more datasets that will be used as input(s) for model predictions
+            One or more datasets that will be used as input(s) for models' predictions
         basin: str
             Basin ID
         as_dataset: bool
@@ -158,7 +155,6 @@ class AbstractModel:
         Returns
         -------
             Model predictions
-
         """
         gen = self.__create_timeseries_generator(ds_list, remove_nan, False)
         predictions = self.__model.predict(gen)
@@ -171,7 +167,7 @@ class AbstractModel:
                               remove_nan: bool = False) -> xr.Dataset:
         """
         Creates a xarray.Dataset for raw model predictions. Therefore, the model outputs and the dataset that has been
-        used as model input for calculating the predictions are aligned. The resulting xarrary.Dataset has the same
+        used as model input for calculating the predictions are aligned. The resulting xarray.Dataset has the same
         coordinate dimensions as the input dataset. NaN values may be optionally removed.
 
         Parameters
@@ -190,8 +186,8 @@ class AbstractModel:
 
         Returns
         -------
-        Model predictions as xarray.Dataset
-
+        xarray.Dataset
+            Model predictions as xarray.Dataset
         """
         if isinstance(self._config.timesteps, int):
             timesteps = self._config.timesteps
@@ -222,7 +218,6 @@ class AbstractModel:
         ----------
         storage_path: str
             Path to the storage directory.
-
         """
         storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
@@ -251,7 +246,26 @@ class LstmModel(AbstractModel):
     predicting one or more target variables from timeseries inputs. Various configurable model parameters, such as the
     number of stacked layers, dropout rate and size of hidden units define the model architecture.
 
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model. The model architecture depends on cfg.params,
+        which holds dict-like model parameters.
+
+        Attributes of cfg.params for LSTM:
+        - lstm:
+            - hiddenLayers: number of LSTM layers (int)
+            - units: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+            - dropout: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+        Example:
+        {"lstm": {"hiddenLayers": 2, "units": [32, 32], "dropout": [0.1, 0]}}
     """
+
+    def __init__(self, cfg: config.ModelConfig):
+        """
+        Creates a LstmModel instance
+        """
+        super().__init__(cfg)
 
     def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None) -> tf.keras.Model:
         """
@@ -271,7 +285,6 @@ class LstmModel(AbstractModel):
         -------
         tf.keras.Model
             A Tensorflow based LSTM model
-
         """
         hidden_layers, units, dropout = params
 
@@ -313,7 +326,27 @@ class CnnLstmModel(AbstractModel):
     operations at first. The extracted timeseries features then are passed to a stack of LSTM layer to predict one
     or more target variables
 
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model. The model architecture depends on cfg.params,
+        which holds dict-like model parameters.
+
+        Attributes of cfg.params for CNN-LSTM:
+        - cnn:
+            - hiddenLayers: number of time-distributed Conv2D layers (int). After each Conv2D layer follows a
+              MaxPooling2D layer, except the last Conv2D layer, which has a GlobalMaxPooling2D on top.
+            - filters: number of filters for each Conv2D layer (list of int, with the same length as hiddenLayers)
+        - lstm:
+            - hiddenLayers: number of LSTM layers (int)
+            - units: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+            - dropout: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+        Example:
+        {"cnn": {"hiddenLayers": 3, "filters": [8, 16, 32]}, "lstm": {"hiddenLayers": 1, "units": [32], "dropout": [0]}}
     """
+
+    def __init__(self, cfg: config.ModelConfig):
+        super().__init__(cfg)
 
     def _build_model(self, input_shape: tuple, params: tuple, output_size: int = None) -> tf.keras.Model:
         """
@@ -339,7 +372,6 @@ class CnnLstmModel(AbstractModel):
         -------
         tf.keras.Model
             A Tensorflow based CNN-LSTM model
-
         """
         hidden_cnn_layers, filters, hidden_lstm_layers, units, dropout = params
 
@@ -427,13 +459,36 @@ class MultiInputCnnLstmModel(AbstractModel):
     timeseries data as well as short-term two-dimensional (raster) timeseries data. This approach adds enhanced
     spatial information to the model and limits computational efforts for training the model at the same time.
 
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model. The model architecture depends on cfg.params,
+        which holds dict-like model parameters.
+
+        Attributes of cfg.params for Multi input CNN-LSTM:
+        - cnn:
+            - hiddenLayers: number of time-distributed Conv2D layers for the CNN-LSTM part of the model (int). After
+              each Conv2D layer follows a MaxPooling2D layer, except the last Conv2D layer, which has a
+              GlobalMaxPooling2D on top.
+            - filters: number of filters for each time-distributed Conv2D layer (list of int, with the same length as
+              hiddenLayers)
+        - lstm:
+            - hiddenLayers: number of LSTM layers for both the LSTM and CNN-LSTM part of the model (int)
+            - units: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+            - dropout: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+        Example:
+        {"cnn": {"hiddenLayers": 3, "filters": [8, 16, 32]}, "lstm": {"hiddenLayers": 1, "units": [32], "dropout": [0]}}
     """
+
+    def __init__(self, cfg: config.ModelConfig):
+        super().__init__(cfg)
 
     def _build_model(self, input_shape: Union[tuple, List[tuple]], params: tuple, output_size: int = None) -> tf.keras.Model:
         """
         Builds a Tensorflow models that comprises a combination of CNN and LSTM layers
 
-        The classical LSTM part takes one-dimensional timeseries data as inputs and comprises multiple stacked LSTM layers.
+        The classical LSTM part takes one-dimensional timeseries data as inputs and comprises multiple stacked LSTM
+        layers.
 
         The CNN-LSTM part takes two-dimensional (raster) timeseries data as inputs. A stack of Conv2D and MaxPooling2D
         is embedded within a TimeDistributed layer, to apply convolutional and max pooling operations on each temporal
@@ -457,7 +512,6 @@ class MultiInputCnnLstmModel(AbstractModel):
         -------
         tf.keras.Model
             A Tensorflow based multi input CNN-LSTM model
-
         """
         hidden_cnn_layers, filters, hidden_lstm_layers, lstm_units, lstm_dropout = params
 
@@ -485,7 +539,8 @@ class MultiInputCnnLstmModel(AbstractModel):
         # CNN-LSTM layers
         cnn_lstm_x = conv2d_x
         for i in range(0, hidden_lstm_layers - 1):
-            cnn_lstm_x = tf.keras.layers.LSTM(lstm_units[i], return_sequences=True, dropout=lstm_dropout[i], use_bias=True)(cnn_lstm_x)
+            cnn_lstm_x = tf.keras.layers.LSTM(lstm_units[i], return_sequences=True, dropout=lstm_dropout[i],
+                                              use_bias=True)(cnn_lstm_x)
         cnn_lstm_x = tf.keras.layers.LSTM(lstm_units[hidden_lstm_layers - 1], return_sequences=False,
                                           dropout=lstm_dropout[hidden_lstm_layers - 1], use_bias=True)(cnn_lstm_x)
 
@@ -555,7 +610,23 @@ class ConvLstmModel(AbstractModel):
     The idea of this model is to process timeseries of raster data with a stack of LSTM layers that perform
     convolutional operations by using input-to-state and state-to-state transitions.
 
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model. The model architecture depends on cfg.params,
+        which holds dict-like model parameters.
+
+        Attributes of cfg.params for ConvLSTM:
+        - cnn:
+            - hiddenLayers: number of ConvLSTM2D layers (int). After each ConvLSTM2D layer follows a MaxPooling3D layer,
+              except the last ConvLSTM2D layer, which has a GlobalMaxPooling2D on top.
+            - filters: number of filters for each Conv2D layer (list of int, with the same length as hiddenLayers)
+        Example:
+        {"cnn": {"hiddenLayers": 3, "filters": [8, 16, 32]}}
     """
+
+    def __init__(self, cfg: config.ModelConfig):
+        super().__init__(cfg)
 
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None) -> tf.keras.Model:
         """
@@ -579,7 +650,6 @@ class ConvLstmModel(AbstractModel):
             A Tensorflow based ConvLSTM model
 
         """
-
         hidden_cnn_layers, filters = params
 
         model = tf.keras.models.Sequential([
@@ -592,7 +662,7 @@ class ConvLstmModel(AbstractModel):
             model.add(tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)), )
         model.add(tf.keras.layers.ConvLSTM2D(filters[hidden_cnn_layers - 1], (3, 3), activation="relu", padding="same",
                                              return_sequences=False))
-        model.add(tf.keras.layers.GlobalMaxPooling2D(), )
+        model.add(tf.keras.layers.GlobalMaxPooling2D())
 
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
@@ -632,7 +702,23 @@ class Conv3DModel(AbstractModel):
     The idea of this model is to process spatially distributed timeseries data by using three-dimensional convolutional
     operations.
 
+    Parameters
+    ----------
+    cfg: config.ModelConfig
+        Parameters used to configure building and training of the model. The model architecture depends on cfg.params,
+        which holds dict-like model parameters.
+
+        Attributes of cfg.params for Conv3D:
+        - cnn:
+            - hiddenLayers: number of Conv3D layers (int). After each Conv3D layer follows a MaxPooling3D layer, except
+              the last Conv3D layer, which has a GlobalMaxPooling3D on top.
+            - filters: number of filters for each Conv3D layer (list of int, with the same length as hiddenLayers)
+        Example:
+        {"cnn": {"hiddenLayers": 3, "filters": [8, 16, 32]}}
     """
+
+    def __init__(self, cfg: config.ModelConfig):
+        super().__init__(cfg)
 
     def _build_model(self, input_shape: tuple, params: dict, output_size: int = None) -> tf.keras.Model:
         """
@@ -709,12 +795,10 @@ def factory(cfg: config.ModelConfig) -> AbstractModel:
     cfg: config.ModelConfig
         Parameters used to configure building and training of the model
 
-
     Returns
     -------
     AbstractModel
         An instance of a subclass of AbstractModel
-
     """
     if cfg.model_type == "lstm":
         return LstmModel(cfg)
@@ -729,7 +813,7 @@ def factory(cfg: config.ModelConfig) -> AbstractModel:
     raise ValueError("No model for the given type '{}' available.".format(cfg.model_type))
 
 
-def load_model(storage_path: str, cfg: config.ModelConfig):
+def load_model(storage_path: str, cfg: config.ModelConfig) -> AbstractModel:
     """
     Loads a trained model from a given directory.
 
@@ -742,8 +826,8 @@ def load_model(storage_path: str, cfg: config.ModelConfig):
 
     Returns
     -------
-    A trained model instance
-
+    AbstractModel
+        A trained model instance that inherits AbstractModel
     """
     model = factory(cfg)
     model.model = tf.keras.models.load_model(storage_path)

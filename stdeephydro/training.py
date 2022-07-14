@@ -3,20 +3,41 @@ import os
 
 from stdeephydro import common
 from stdeephydro import config
+from stdeephydro import dataset
 from stdeephydro import ioutils
 from stdeephydro import models
 from stdeephydro import monitoring
 from stdeephydro import processing
 from stdeephydro import evaluation
 from stdeephydro import dataloader
-from typing import List
-
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.HydroDataLoader],
-                         processor_list: List[processing.AbstractProcessor], basin: str):
+                         processor_list: List[processing.AbstractProcessor], basin: str)\
+        -> Tuple[List[dataset.HydroDataset], List[dataset.HydroDataset], List[dataset.HydroDataset]]:
+    """
+    Performs data loading and data preprocessing steps for training, validation and test data
+
+    Parameters
+    ----------
+    cfg: config.Config
+        Training runtime configuration
+    data_loader_list: List of dataloader.HydroDataLoader
+        Used for loading training, validation and test datasets
+    processor_list: List of dataloader.HydroDataLoader
+        Used for processing training, validation and test datasets
+    basin: List of str
+        List of basin IDs
+
+    Returns
+    -------
+    Tuple[List[dataset.HydroDataset], List[dataset.HydroDataset], List[dataset.HydroDataset]]
+        One or more datasets that will be used for model training and evaluation
+
+    """
     for f_cfg in cfg.data_config.forcings_cfg:
         logger.info(f"Load '{f_cfg}' forcings.")
     logger.info(f"Load '{cfg.data_config.streamflow_cfg.data_type}' streamflow data.")
@@ -56,7 +77,29 @@ def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.H
         raise common.DataPreparationError("Error during data preparation while trying to read a file.") from e
 
 
-def run_build_and_compile_model(cfg: config.Config, ds_train_list, ds_validation_list, out_dir=None):
+def run_model_training(cfg: config.Config, ds_train_list: List[dataset.HydroDataset],
+                       ds_validation_list: List[dataset.HydroDataset], out_dir=None) -> models.AbstractModel:
+    """
+    Builds, compiles and fits a model to a training dataset. Some model architectures require multiple inputs for
+    training and validation. Therefore, a list of datasets have to be passed to this method.
+
+    Parameters
+    ----------
+    cfg: config.Config
+        Model training runtime config
+    ds_train_list: List of dataset.HydroDataset
+        Datasets used as inputs for model training
+    ds_validation_list: List of dataset.HydroDataset
+        Datasets used for model validation during training
+    out_dir: str
+        Path to the directory, which will be used for storing intermediate results (e.g., training checkpoints) during
+        training
+
+    Returns
+    -------
+    models.AbstractModel
+        The trained model
+    """
     logger.info(f"Build model of type '{cfg.model_config.model_type}'.")
     try:
         model = models.factory(cfg.model_config)
@@ -84,7 +127,31 @@ def run_build_and_compile_model(cfg: config.Config, ds_train_list, ds_validation
         raise common.TrainingError("Error during model fitting due to an unsupported calculation.") from e
 
 
-def run_evaluation(model, ds_test_list, processor_list, target_var, basin) -> evaluation.Evaluation:
+def run_evaluation(model, ds_test_list: List[dataset.HydroDataset], processor_list: List[processing.AbstractProcessor],
+                   target_var: str, basin: str) -> evaluation.Evaluation:
+    """
+    Performs model evaluation on a test dataset. Some model architectures require multiple inputs. Therefore, a list of
+    datasets have to be passed to this method which will be used as test inputs.
+
+    Parameters
+    ----------
+    model: models.Model
+        A trained model that should be evaluated
+    ds_test_list: List of dataset.HydroDataset
+        Datasets used as test inputs for model evaluation
+    processor_list: List of processing.AbstractProcessor
+        Used for processing each dataset
+    target_var: str
+        Name of the prediction target variable
+    basin: str
+        ID of the basin for which the model will be evaluated
+
+    Returns
+    -------
+    evaluation.Evaluation
+        Evaluation metrics
+
+    """
     logger.info("Start evaluating model...")
     ds_prediction = model.predict(ds_test_list, basin, as_dataset=True, remove_nan=False)
     result = model.evaluate(ds_test_list, True, basin)
@@ -103,7 +170,20 @@ def run_evaluation(model, ds_test_list, processor_list, target_var, basin) -> ev
     return eval_res
 
 
-def run_training(cfg: config.Config, dry_run):
+def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
+    """
+    Runs model training and evaluation for the purpose of a rainfall runoff prediction in multiple basins. For each
+    basin a separate model will be trained and evaluated. Evaluation results are stored within separate NetCDF files for
+    each basin and in an overall NetCDF file that folds evaluation metrics for all basins.
+
+    Parameters
+    ----------
+    cfg: config.Config
+        Runtime configuration for model training and evaluation
+    dry_run: bool
+        Indicates a dry run. If true, no intermediate or evaluation results are stored.
+
+    """
     work_dir = None
     if not dry_run:
         work_dir = ioutils.create_out_dir(cfg.general_config.output_dir, cfg.general_config.name)
@@ -132,7 +212,7 @@ def run_training(cfg: config.Config, dry_run):
         try:
             logger.info(f"Prepare data for basin {basin}.")
             ds_train_list, ds_validation_list, ds_test_list = run_data_preparation(cfg, data_loader_list, processor_list, basin)
-            model = run_build_and_compile_model(cfg, ds_train_list, ds_validation_list, out_dir)
+            model = run_model_training(cfg, ds_train_list, ds_validation_list, out_dir)
             eval_res = run_evaluation(model, ds_test_list, processor_list, cfg.data_config.streamflow_cfg.variables[0], basin)
 
             if not dry_run:

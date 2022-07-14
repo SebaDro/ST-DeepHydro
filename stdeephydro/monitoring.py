@@ -4,6 +4,21 @@ from stdeephydro import config
 
 
 class TrainingMonitor:
+    """
+    Wrapper class for various monitoring strategies during training
+
+    Parameters
+    ----------
+    out_dir: str
+        Path to the output directory for monitoring callbacks
+    save_checkpoints: bool
+        Indicates whether to store checkpoints during training or not. If true, tf.keras.callbacks.ModelCheckpoint
+        is used for training.
+    log_tensorboard_events: bool
+        Indicates whether to log events during training for Tensorboard analysis. If true,
+        tf.keras.callbacks.TensorBoard is used for model training
+    """
+
     def __init__(self, out_dir: str, save_checkpoints: bool, log_tensorboard_events: bool):
         self.__out_dir = out_dir
         self.__save_checkpoints = save_checkpoints
@@ -27,6 +42,20 @@ class TrainingMonitor:
 
 
 def training_monitor_factory(cfg: config.GeneralConfig, out_dir: str):
+    """
+    Creates a TrainingMonitor instance from config.GeneralConfig
+
+    Parameters
+    ----------
+    cfg: config.GeneralConfig
+        Runtime monitoring configuration parameters
+    out_dir: str
+        Monitoring output directory
+
+    Returns
+    -------
+    TrainingMonitor
+    """
     if out_dir is None:
         out_dir = os.path.join(cfg.output_dir, cfg.name)
     else:

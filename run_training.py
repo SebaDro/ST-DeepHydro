@@ -37,7 +37,7 @@ def main():
         else:
             logging.debug(f"Config: '{cfg_dict}'")
             cfg = config.Config.from_dict(cfg_dict)
-            training.run_training(cfg, dry_run)
+            training.run_training_and_evaluation(cfg, dry_run)
 
         logging.info("Finished run_training.py")
     except config.ConfigError:

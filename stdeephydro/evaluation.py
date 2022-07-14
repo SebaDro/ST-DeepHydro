@@ -73,6 +73,12 @@ def calc_evaluation(ds_obs: xr.Dataset, ds_pred: xr.Dataset, target_var: str, ba
 
 
 class Evaluation:
+    """
+    Class for handling evaluation metrics.
+
+    This class wraps metrics that have been calculated from model evaluation as xarray.Dataset. Evaluation metrics can
+    be appended and stored for several models.
+    """
 
     def __init__(self):
         self.__ds_results = xr.Dataset()

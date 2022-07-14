@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import xarray
 import xarray as xr
 
 from stdeephydro import config
@@ -10,6 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractDatasetLoader:
+    """
+    Abstract dataset loader base class, which should be used to implement subclasses for loading certain datasets.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the root dir that contains the datasets
+    variables: list of str
+        List of names for variables that should be loaded as part of the dataset
+    basins: list of str
+        List of IDs that indicate for which basins the dataset should be loaded. If not set, datasets for all basins
+        within the root data_dir will be loaded
+    """
 
     def __init__(self, data_dir: str, variables: list, basins: list = None):
         self.__data_dir = data_dir
@@ -43,6 +57,30 @@ class AbstractDatasetLoader:
 
 
 class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
+    """
+    Data loader for streamflow timeseries data from the CAMELS-US dataset
+
+    This class loads CAMELS-US streamflow timeseries data as xarray.Dataset. For this purpose, the data loader assumes
+    the standard CAMELS-US folder structure when downloading the NCAR CAMELS-US dataset. This dataset contains
+    streamflow timeseries as separate files for each basin within the directory
+    'basin_dataset_public_v1p2/usgs_streamflow'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the 'usgs_streamflow' CAMELS-US directory
+    variables: list of str
+        List of CAMELS-US variables to load (i.e. only 'streamflow')
+    basins:
+        List of basin IDs
+    forcings_dir:
+        Path to a CAMELS-US forcings directory. If set, basin attributes will be read from the forcings files to
+        normalize streamflow by using the basin area.
+    as_dask:
+        Indicates whether to load the dataset as Dask Array. Should be set to True if datasets does not fit into memory.
+        Note, this is still an experimental feature, since timeseries window generation is not optimized for Dask
+        Arrays, so far.
+    """
 
     def __init__(self, data_dir: str, variables: list, basins: list = None, forcings_dir: str = None,
                  as_dask: bool = False):
@@ -81,8 +119,8 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
         data loader.
 
         Note, that streamflow will be normalized if the data loader has been initialized with a given forcings directory.
-        This means streamflow will be devided by the basin area and converted to meters per day. For loading basin area
-        information you have to instantiate this data loader by additionally passing the forcings directory.
+        This means streamflow will be divided by the basin area and converted into meters per day. For loading basin
+        area information you have to instantiate this data loader by additionally passing the forcings directory.
 
         Parameters
         ----------
@@ -90,9 +128,6 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
             String that represents a date. It will be used as start date for subsetting the timeseries datasets.
         end_date: str
             String that represents a date. It will be used as end date for subsetting the timeseries datasets.
-        as_dask: bool:
-            Indicates if the dataset should be load as Dask Array. Should be set as True if datasets does not fit into
-            memory.
 
         Returns
         -------
@@ -139,6 +174,31 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
 
 
 class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
+    """
+    Data loader for forcings timeseries data from the CAMELS-US dataset
+
+    This class loads CAMELS-US forcings timeseries data as xarray.Dataset. For this purpose, the data loader assumes
+    the standard CAMELS-US folder structure when downloading the NCAR CAMELS-US dataset. This dataset contains
+    forcings timeseries from three different sources (Daymet, Maurer, NLDAS) as separate files for each basin. Forcing
+    files for each source are stored within separate subdirectories of 'basin_dataset_public_v1p2/basin_mean_forcing'.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the forcings CAMELS-US subdirectory (daymet, maurer or nldas)
+    variables: list of str
+        List of CAMELS-US forcing variables to load
+    basins:
+        List of basin IDs
+    as_dask:
+        Indicates whether to load the dataset as Dask Array. Should be set to True if datasets does not fit into memory.
+
+    Notes
+    -----
+    Loading datasets as Dask Array is still an experimental feature. Some dataset processing routines, such as
+    timeseries window generation, are not optimized for Dask Arrays. Therefore, the run_training command line script
+    does not support this option.
+    """
 
     def __init__(self, data_dir: str, variables: list, basins: list = None, as_dask: bool = False):
         super().__init__(data_dir, variables, basins)
@@ -179,9 +239,6 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
             String that represents a date. It will be used as start date for subsetting the timeseries datasets.
         end_date: str
             String that represents a date. It will be used as end date for subsetting the timeseries datasets.
-        as_dask: bool:
-            Indicates if the dataset should be load as Dask Array. Should be set as True if datasets does not fit into
-            memory.
 
         Returns
         -------
@@ -218,6 +275,25 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
 
 
 class DaymetDataLoader(AbstractDatasetLoader):
+    """
+    Data loader for raster-based Daymet forcings stored in NetCDF file format.
+
+    The data loader loads ORNL DAAC Daymet NetCDF data as xarray.Dataset. For this purpose the data loader expects that
+    separate NetCDF files for each basin exists within a root data_dir. Each NetCDF file must contain a unique basin ID
+    as part of the filename. Discovery of NetCDF files for specified basins will be performed using the pattern
+    '{data_dir}/*{basin}*.nc', i.e. the basin ID has to be present in any file name within the directory.
+
+    Parameters
+    ----------
+    data_dir: str
+        Path to the data directory that
+    variables: list of str
+        List of CAMELS-US forcing variables to load
+    basins:
+        List of basin IDs
+    from_zarr: bool
+        Indicates that datasets should be loaded from a Zarr store
+    """
 
     def __init__(self, data_dir: str, variables: list, basins: list = None, from_zarr: bool = False):
         super().__init__(data_dir, variables, basins)
@@ -258,6 +334,11 @@ class DaymetDataLoader(AbstractDatasetLoader):
 
         The dataset is meant to be valid for multiple basins e.g., if streamflow should be predicted for multiple
         basins, the joined Daymet forcings dataset covers all basins.
+
+        Notes
+        -----
+        Loading joined data is still an experimental feature and may not be supported across the whole package.
+        Therefore, it can't be used with the run_training command line script.
 
         Parameters
         ----------
@@ -300,23 +381,26 @@ class DaymetDataLoader(AbstractDatasetLoader):
 
 
 class HydroDataLoader:
+    """
+    Data loader class for loading forcings and streamflow data from arbitrary data sources as combined
+    dataset.HydroDataset.
+
+    This class holds certain forcings and streamflow data loader instances in order to load hydro-meteorological
+    timeseries data as combined xarray.Datasets which comprises, basin indexed forcings and streamflow timeseries data.
+
+    Parameters
+    ----------
+    forcings_data_loader: AbstractDatasetLoader
+        Instance for loading forcings timeseries data as xarray.Dataset
+    streamflow_data_loader: AbstractDatasetLoader
+        Instance for loading streamflow timeseries data as xarray.Dataset
+    forcings_vars: list
+        List of forcings variable names. The variables will be used for subsetting the forcings dataset.
+    streamflow_var: str
+        Streamflow variable name. The variable will be used for subsetting the streamflow dataset.
+    """
     def __init__(self, forcings_data_loader: AbstractDatasetLoader, streamflow_data_loader: AbstractDatasetLoader,
                  forcings_vars: list, streamflow_var: str):
-        """
-        Default initializer for a data loader instance which loads and combines forcings and streamflow timeseries data
-        for basins.
-
-        Parameters
-        ----------
-        forcings_data_loader: AbstractDatasetLoader
-            Instance for loading forcings timeseries data as xarray.Dataset
-        streamflow_data_loader: AbstractDatasetLoader
-            Instance for loading streamflow timeseries data as xarray.Dataset
-        forcings_vars: list
-            List of forcings variable names. The variables will be used for subsetting the forcings dataset.
-        streamflow_var: str
-            Streamflow variable name. The variable will be used for subsetting the streamflow dataset.
-        """
         self.__forcings_dataloader = forcings_data_loader
         self.__streamflow_dataloader = streamflow_data_loader
         self.__forcings_variables = forcings_vars
@@ -362,7 +446,7 @@ class HydroDataLoader:
     def streamflow_variable(self):
         return self.__streamflow_variable
 
-    def load_single_dataset(self, start_date: str, end_date: str, basin: str):
+    def load_single_dataset(self, start_date: str, end_date: str, basin: str) -> dataset.HydroDataset:
         """
         Uses the forcings and streamflow DatasetsLoader to load a single timeseries dataset as xarray.Dataset which
         contains merged forcings and streamflow data.
@@ -455,7 +539,18 @@ class HydroDataLoader:
                                     start_date, end_date)
 
 
-def streamflow_to_metric(streamflow):
+def streamflow_to_metric(streamflow: xarray.DataArray):
+    """
+    Converts streamflow from cubic feet per second to cubic meters per second
+
+    Parameters
+    ----------
+    streamflow
+
+    Returns
+    -------
+
+    """
     return streamflow * 0.028316846592  # [m³/s]
 
 
@@ -467,6 +562,26 @@ def normalize_streamflow(streamflow, area: float):
 
 
 def forcings_factory(forcings_type: str, basins: list, forcings_dir: str, forcings_vars: list) -> AbstractDatasetLoader:
+    """
+    Creates a certain DataLoader instance for loading forcings timeseries for the specified forcings type.
+
+    Parameters
+    ----------
+    forcings_type: str
+        Forcings type. Supported: 'camels-us', 'daymet'
+    basins: List of str
+        List of basin IDs to load forcings for
+    forcings_dir: str
+        Path to the directory that contains forcings data files
+    forcings_vars: List of str
+        List of variable names to load forcings for
+
+    Returns
+    -------
+    AbstractDatasetLoader
+        A DatasetLoader instance that load forcings data
+
+    """
     if forcings_type == "camels-us":
         return CamelsUsForcingsDataLoader(forcings_dir, forcings_vars, basins)
     if forcings_type == "daymet":
@@ -475,6 +590,26 @@ def forcings_factory(forcings_type: str, basins: list, forcings_dir: str, forcin
 
 
 def streamflow_factory(streamflow_type: str, basins: list, streamflow_dir: str, streamflow_vars: list) -> AbstractDatasetLoader:
+    """
+    Creates a certain DataLoader instance for loading streamflow timeseries for the specified streamflow type.
+
+    Parameters
+    ----------
+    streamflow_type: str
+        Streamflow type. Supported: 'camels-us'
+    basins: List of str
+        List of basin IDs to load streamflow for
+    streamflow_dir: str
+        Path to the directory that contains streamflow data files
+    streamflow_vars: List of str
+        List of variable names to load streamflow for
+
+    Returns
+    -------
+    AbstractDatasetLoader
+        A DatasetLoader instance that loads streamflow data
+
+    """
     if streamflow_type == "camels-us":
         return CamelsUsStreamflowDataLoader(streamflow_dir, streamflow_vars, basins)
     raise ValueError("No streamflow data loader exists for the specified dataset type '{}.".format(streamflow_type))
