@@ -1,5 +1,3 @@
-from abc import ABC
-
 import numpy as np
 import os
 import tensorflow as tf
@@ -658,23 +656,47 @@ class Conv3DModel(AbstractModel):
             A Tensorflow based ConvLSTM model
 
         """
+        hidden_cnn_layers, filters = params
+
         model = tf.keras.models.Sequential([
             tf.keras.layers.InputLayer(input_shape=input_shape),
-            tf.keras.layers.Conv3D(8, (1, 3, 3), activation="relu", padding="same"),
-            tf.keras.layers.MaxPooling3D((1, 2, 2)),
-            tf.keras.layers.Conv3D(16, (1, 3, 3), activation="relu", padding="same"),
-            tf.keras.layers.MaxPooling3D((1, 2, 2)),
-            tf.keras.layers.Conv3D(32, (1, 3, 3), activation="relu", padding="same"),
-            tf.keras.layers.GlobalMaxPooling3D()
         ])
+
+        for i in range(0, hidden_cnn_layers - 1):
+            model.add(tf.keras.layers.Conv3D(filters[i], (1, 3, 3), activation="relu", padding="same",))
+            model.add(tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2)), )
+        model.add(tf.keras.layers.Conv3D(filters[hidden_cnn_layers - 1], (1, 3, 3), activation="relu", padding="same"))
+        model.add(tf.keras.layers.GlobalMaxPooling3D(), )
+
         if output_size is None:
             model.add(tf.keras.layers.Dense(units=1))
         else:
             model.add(tf.keras.layers.Dense(units=output_size))
         return model
 
+    def __get_and_validate_cnn_params(self, params: dict):
+        try:
+            hidden_layers = params["hiddenLayers"]
+            filters = params["filters"]
+            if not isinstance(hidden_layers, int):
+                raise config.ConfigError(
+                    f"Wrong type of 'hiddenLayers' parameter: {type(hidden_layers)}. Expected: 'int'")
+            if hidden_layers < 0:
+                raise config.ConfigError(f"Wrong number of hidden layers: {hidden_layers}. Expected: >=0")
+            if len(filters) != hidden_layers:
+                raise config.ConfigError(
+                    f"Wrong number of layer unit definitions: {len(filters)}. Expected: {hidden_layers}")
+            return hidden_layers, filters
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
+
     def _get_and_validate_params(self, params: dict) -> tuple:
-        pass
+        try:
+            cnn_params = params["cnn"]
+            hidden_cnn_layers, filters = self.__get_and_validate_cnn_params(cnn_params)
+            return hidden_cnn_layers, filters
+        except KeyError as ex:
+            raise config.ConfigError(f"Required model parameter is missing: {ex}") from ex
 
 
 def factory(cfg: config.ModelConfig) -> AbstractModel:
