@@ -53,15 +53,22 @@ python3 -m pip install -e .
 The installation also makes a bash script (_run_training_) available within your environment.
 
 ## Data
-This package mainly focuses on training models for rainfall runoff predictions by using the hydro-meteorological datasets.
-Therefore, a variety of datasets are suitable to be used as training data. Though, especially CAMELS-US and Daymet
-datasets has been widely proven as appropriate input datasets for hydrological modelling. 
+The ST-DeepHydro library mainly focuses on training models for rainfall runoff predictions by using hydro-meteorological
+datasets. For this purpose, a variety of datasets are suitable to be used as training data. Though, especially CAMELS-US
+and Daymet datasets has been widely proven as appropriate input datasets for hydrological modelling.
+
+For loading different types of hydro-meteorological datasets the [stdeephydro.dataloader](./stdeephydro/dataloader.py)
+module comes with various dataloader implementations.
+
 
 ### CAMELS-US
 The CAMELS-US dataset contains hydro-meteorological timeseries data for 671 basins in the continuous United States [[2]](#2).
 Meteorological products contain basin aggregated daily forcings from three different data sources (Daymet, Maurer and NLDAS). 
 Daily streamflow data for 671 gauges comes from the United States Geological Survey National Water Information System.
 You simply can download this large-sample dataset from the [NCAR website](https://ral.ucar.edu/solutions/products/camels).
+
+To load CAMELS-US datasets use the `CamelsUsStreamflowDataLoader` and `CamelsUsForcingsDataLoader` classes. See their
+documentation for further usage information. 
 
 ### Daymet
 Daymet data contain gridded estimates of daily weather and climatology parameters at a 1 km x 1 km raster for North
@@ -70,10 +77,187 @@ and can be via ORNL DAAC's Thematic Real-time Environmental Distributed Data Ser
 datasets for your preferred region and prepare it for model training, you might want to use the
 [Daymet PyProcessing](https://github.com/SebaDro/daymet-pyprocessing) toolset.
 
+The `DaymetDataLoader` class is able to load 1-dimensional (temporally distributed) as well as 2-dimensional 
+(raster-based, spatio-temporally distributed) Daymet NetCDF data.
+
+See it's documentation for further details.
+
 ## Models
+To train neural networks for timeseries forecasting the ST-DeepHydro library implements different network architectures,
+based on the Deep Learning framework Tensorflow. Although, these networks are intended to model rainfall-runoff
+in river catchments, other hydrological modelling use-cases are conceivable. Model types comprise lumped and distributed
+models. While lumped models are trained on aggregated meteorological timeseries data, distributed models have a special
+focus on learning spatio-temporal catchment processes. This makes them suitable to be trained on spatio-temporal 
+hydro-meteorological datasets, i.e. timeseries of raster data.
+
+The [stdeephydro.models](./stdeephydro/models.py) module contains all model implementations. Here, you will find a
+variety of Tensorflow models for different use cases and data types.
+
+### LSTM
+`stdeephydro.models.LstmModel` builds a classical LSTM model, which is able to learn hydrological processes within
+catchment areas from aggregated hydro-meteorological input datasets. The model is applicable for rainfall-runoff
+timeseries forecasting by predicting gauge streamflow.
+
+The Tensorflow model comprises one or more stacked (hidden) LSTM layers with a fully connected layer on top for
+predicting one or more target variables from timeseries inputs. 
+
+#### LSTM Attributes:
+Required values for `cfg.params`:
+- `lstm`:
+  - `hiddenLayers`: number of LSTM layers (int)
+  - `units`: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+  - `dropout`: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+
+**Example:**
+```yml
+params:
+  lstm:
+    hiddenLayers: 2
+    units:
+      - 32
+      - 32
+    dropout:
+      - 0.1
+      - 0
+```
+
+### CNN-LSTM 
+`stdeephydro.models.CnnLstmModel` builds a combination of Convolutional Neural Network (CNN) and Long short-term memory
+(LSTM) Tensorflow model. The neural network architecture addresses needs to learn spatio-temporal processes within
+catchments from spatially distributed (raster-based) timeseries data. Therefore, this model type can be trained on 
+meteorological raster data to forecast gauge streamflow or any other hydrological variables within river catchments. 
+
+The idea of this model architecture is to extract features from a timeseries of 2-dimensional raster data by convolutional
+operations at first. The extracted timeseries features then are passed to a stack of LSTM layer to predict one
+or more target variables.
+
+#### CNN-LSTM Attributes:
+Required values for `cfg.params`:
+- `cnn`:
+  - `hiddenLayers`: number of time-distributed Conv2D layers (int). After each Conv2D layer follows a MaxPooling2D layer,
+    except the last Conv2D layer, which has a GlobalMaxPooling2D on top.
+  - `filters`: number of filters for each Conv2D layer (list of int, with the same length as hiddenLayers)
+- `lstm`:
+  - `hiddenLayers`: number of LSTM layers (int)
+  - `units`: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+  - `dropout`: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+
+**Example:**
+```yml
+params:
+  cnn:
+    hiddenLayers: 3
+    filters:
+      - 8
+      - 16
+      - 32
+  lstm:
+    hiddenLayers: 2
+    units:
+      - 32
+      - 32
+    dropout:
+      - 0.1
+      - 0
+```
+
+### Multi Input CNN-LSTM
+The `stdeephydro.models.MultiInputCnnLstmModel` class concatenates a combination of Convolutional Neural Network (CNN) and Long short-term
+memory (LSTM), CNN-LSTM, with a classical LSTM Tensorflow model. With this architecture design the neural network is 
+able to process two input datasets that differ in its spatio-temporal dimensions. Hence, it is possible to train the
+model with lumped meteorological long-term timeseries data as well as spatially-distributed short-term raster data. 
+
+The idea of this model is to enhance the capability of a classical LSTM model to predict target variables from
+one-dimensional timeseries data but also considering spatial distributed timeseries data that are processed by a
+CNN-LSTM part of the model. This approach adds enhanced spatial information to the model and limits computational efforts
+for training the model at the same time.
+
+#### Multi input CNN-LSTM Attributes:
+Required values for `cfg.params`:
+- cnn:
+  - hiddenLayers: number of time-distributed Conv2D layers for the CNN-LSTM part of the model (int). After each Conv2D
+    layer follows a MaxPooling2D layer, except the last Conv2D layer, which has a  GlobalMaxPooling2D on top.
+  - filters: number of filters for each time-distributed Conv2D layer (list of int, with the same length as 
+    hiddenLayers)
+- lstm:
+  - hiddenLayers: number of LSTM layers for both the LSTM and CNN-LSTM part of the model (int)
+  - units: units for each LSTM layer (list of int, with the same length as hiddenLayers)
+  - dropout: dropout for each LSTM layer (list of float, with the same length as hiddenLayers)
+
+**Example:**
+```yml
+params:
+  cnn:
+    hiddenLayers: 3
+    filters:
+      - 8
+      - 16
+      - 32
+  lstm:
+    hiddenLayers: 2
+    units:
+      - 32
+      - 32
+    dropout:
+      - 0.1
+      - 0
+```
+
+### ConvLSTM
+The `stdeephydro.models.ConvLstmModel` class builds Convolutional LSTM Tensorflow model. This architecture is able to predict one or more
+target variables based on spatially distributed timeseries data. The neural network processes timeseries of raster data
+with a stack of LSTM layers that perform convolutional operations by using input-to-state and state-to-state transitions.
+
+Up to now, the ConvLSTM model can be trained on meteorological raster data to predict one-dimensional or any other
+hydrological variables, such as the CNN-LSTM model can do. However, originally ConvLSTM layers are intended for building
+models that are able to produce raster-based predictions. This maybe implemented for future releases to support relevant
+hydrological use cases.
+
+#### ConvLSTM Attributes:
+Required values for `cfg.params`:
+- `cnn`:
+  - `hiddenLayers`: number of ConvLSTM2D layers (int). After each ConvLSTM2D layer follows a MaxPooling3D layer, except
+    the last ConvLSTM2D layer, which has a GlobalMaxPooling2D on top.
+  - `filters`: number of filters for each Conv2D layer (list of int, with the same length as hiddenLayers)
+
+**Example:**
+```yml
+cnn:
+  hiddenLayers: 3
+  filters:
+    - 8
+    - 16
+    - 32
+```
+
+### Conv3D
+The `stdeephydro.models.Conv3DModel` builds Tensorflow model based multiple stacked Conv3D and MaxPooling3D layers.
+Usually, intended to process video data, it applies convolutional and max pooling operations on the spatial as well as
+the temporal dimension of the input data. The model can be trained on a timeseries of meteorological raster data
+to predict gauge streamflow or any other hydrological variables.
+
+#### Conv3D Attributes:
+Required values for `cfg.params`:
+- `cnn`:
+  - `hiddenLayers`: number of Conv3D layers (int). After each Conv3D layer follows a MaxPooling3D layer, except the last
+    Conv3D layer, which has a GlobalMaxPooling3D on top.
+  - `filters`: number of filters for each Conv3D layer (list of int, with the same length as hiddenLayers)
+
+**Example:**
+```yml
+cnn:
+  hiddenLayers: 3
+  filters:
+    - 8
+    - 16
+    - 32
+```
+
+## How to use
+### Training
 TBD
 
-## Training
+### ST-DeepHydro API
 TBD
 
 ## References
