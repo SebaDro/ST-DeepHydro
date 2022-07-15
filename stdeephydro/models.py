@@ -451,6 +451,7 @@ class MultiInputCnnLstmModel(AbstractModel):
     """
     The MultiInputCnnLstmModel class concatenates a combination of Convolutional Neural Network (CNN) and
     Long short-term memory (LSTM), CNN-LSTM, with a classical LSTM Tensorflow model. Therefore, it uses the Tensorflow
+    framework.
 
     The model comprises a combination of CNN-LSTM and LSTM models to process two input datasets that differ in its
     spatio-temporal dimensions. The idea of this model is to enhance the capability of a classical LSTM model to predict
@@ -604,7 +605,7 @@ class MultiInputCnnLstmModel(AbstractModel):
 
 class ConvLstmModel(AbstractModel):
     """
-    The ConvLstmModel class builds ConvLSTM Tensorflow model.
+    The ConvLstmModel class builds Convolutional LSTM Tensorflow model.
 
     The ConvLSTM model is able to predict one or more target variables based on spatially distributed timeseries data.
     The idea of this model is to process timeseries of raster data with a stack of LSTM layers that perform

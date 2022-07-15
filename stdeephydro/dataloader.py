@@ -65,6 +65,8 @@ class CamelsUsStreamflowDataLoader(AbstractDatasetLoader):
     streamflow timeseries as separate files for each basin within the directory
     'basin_dataset_public_v1p2/usgs_streamflow'.
 
+    The resulting xarray.Dataset contains the streamflow variable with dimensions (basin, time).
+
     Parameters
     ----------
     data_dir: str
@@ -182,6 +184,8 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
     forcings timeseries from three different sources (Daymet, Maurer, NLDAS) as separate files for each basin. Forcing
     files for each source are stored within separate subdirectories of 'basin_dataset_public_v1p2/basin_mean_forcing'.
 
+    The resulting xarray.Dataset contains the forcings variables with dimensions (basin, time).
+
     Parameters
     ----------
     data_dir: str
@@ -276,12 +280,20 @@ class CamelsUsForcingsDataLoader(AbstractDatasetLoader):
 
 class DaymetDataLoader(AbstractDatasetLoader):
     """
-    Data loader for raster-based Daymet forcings stored in NetCDF file format.
+    Data loader for raster-based and aggregated Daymet forcings stored in NetCDF file format.
 
     The data loader loads ORNL DAAC Daymet NetCDF data as xarray.Dataset. For this purpose the data loader expects that
     separate NetCDF files for each basin exists within a root data_dir. Each NetCDF file must contain a unique basin ID
     as part of the filename. Discovery of NetCDF files for specified basins will be performed using the pattern
     '{data_dir}/*{basin}*.nc', i.e. the basin ID has to be present in any file name within the directory.
+
+    This data loader is able to read temporal distributed NetCDF data as well as spatio-temporally distributed data.
+    Temporal distributed NetCDF files must contain forcing variables, which are only indexed by 'time' (e.g. basin
+    aggregated forcings). Spatio-temporally NetCDF files must contain forcing variables which are indexed by 'time',
+    'x' and 'y'.
+
+    The resulting xarray.Dataset contains Daymet variables with either with dimensions (basin, time) for aggregated
+    forcings or (basin, time, x, y) for raster-based forcings.
 
     Parameters
     ----------
@@ -539,22 +551,40 @@ class HydroDataLoader:
                                     start_date, end_date)
 
 
-def streamflow_to_metric(streamflow: xarray.DataArray):
+def streamflow_to_metric(streamflow: xarray.DataArray) -> xarray.DataArray:
     """
     Converts streamflow from cubic feet per second to cubic meters per second
 
     Parameters
     ----------
-    streamflow
+    streamflow: xarray.DataArray
+        Streamflow timeseries in cubic feet per second
 
     Returns
     -------
-
+    xarray.DataArray
+        Streamflow timeseries in cubic meters per second
     """
     return streamflow * 0.028316846592  # [m³/s]
 
 
-def normalize_streamflow(streamflow, area: float):
+def normalize_streamflow(streamflow: xarray.DataArray, area: float):
+    """
+    Normalizes streamflow, which has unit cubic feet per second [ft³/s], by dividing it by the basin area [m²] and
+    converting into millimeters per day (mm/d).
+
+    Parameters
+    ----------
+    streamflow: xarray.DataArray
+        Streamflow timeseries in cubic feet per second [ft³/s]
+    area: float
+        Basin area in square meters [m²]
+
+    Returns
+    -------
+    Streamflow timeseries in meters per day (mm/d)
+
+    """
     streamflow = streamflow * 0.028316846592  # [m³/s]
     streamflow = streamflow / area  # [m/s]
     streamflow = streamflow * 86400  # [m/d]
