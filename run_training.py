@@ -3,8 +3,8 @@ import logging
 import logging.config
 import yaml
 
-from libs import config
-from libs import training
+from stdeephydro import config
+from stdeephydro import training
 
 with open("./config/logging.yml", "r") as stream:
     log_config = yaml.load(stream, Loader=yaml.FullLoader)
