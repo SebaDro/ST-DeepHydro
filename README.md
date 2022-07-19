@@ -255,6 +255,39 @@ cnn:
 
 ## How to use
 ### Training
+Model training and evaluating for multiple basins can be simply performed by using the _run_training_ command line tool.
+This tool will be automatically available in your environment when installing this package. 
+#### Data preparation
+To train a model, one of the supported datasets mentioned in the [Data section](#data) is required. So, before you
+start with model training, make sure that you have properly prepared all the datasets you want to use for training:
+1. Download one or more of the supported datasets. You'll need a streamflow datasets and a forcings dataset.
+2. Place all datasets within a separate folder. It is required, that for each basin you want to train a model for, a
+corresponding dataset file exists int the data folder, which has the basin ID in its file name.
+3. Forcing files and streamflow files should be placed in different folders, if your datasets does not contain both
+variable sets jointly.
+4. Create a text file (e.b. "basins.txt") that lists all basins you want to perform model training and evaluating on.
+Each basin ID must be on a separate line. There is an [example file](./config/basins.txt) within this repository. Make
+sure, that the data folder contains corresponding files for each basin you list in the basins file.
+#### Configuration
+Several training aspects, such as the neural network architecture, dataset types or number of training epochs, can be
+customized by providing a configuration file. The [./config](./config) folder comes with several examples for such a file.
+In addition, this section describes all configuration parameters that are supported at the moment.
+
+##### General Parameters
+General configuration parameters must be defined under the `general`key:  
+
+| Config Parameter       | Type      | Description                                                                                                                |
+|------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------|
+| _name_                 | `string`  | Name of the experiment. This name will be used for prefixing some of the outputs.                                          |
+| _outputDir_            | `string`  | Path to a directory, which will be used for storing outputs such as the trained model, checkpoints and evaluation results. |
+| _saveCheckpoints_      | `boolean` | Indicates whether to save training checkpoints or not.                                                                     |
+| _saveModel_            | `boolean` | Indicates whether to store the trained model or not.                                                                       |
+| _logTensorboardEvents_ | `boolean` | Indicates whether to log events during training for Tensorboard or not.                                                    |
+
+##### Data Parameters
+TBD
+
+##### Model Parameters
 TBD
 
 ### ST-DeepHydro API
