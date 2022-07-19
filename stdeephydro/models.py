@@ -216,7 +216,7 @@ class AbstractModel:
         ds_prediction = ds_prediction.expand_dims("basin")
         return ds_prediction
 
-    def save_model(self, storage_path: str):
+    def save_model(self, storage_path: str, as_hdf5: bool = False):
         """
         Stores a trained model within the given directory.
 
@@ -224,9 +224,16 @@ class AbstractModel:
         ----------
         storage_path: str
             Path to the storage directory.
+        as_hdf5: bool
+            If true, the model is stored in HDF5 format. Per default, the trained model will be stored in
+            Tensorflow SavedModels format.
 
         """
-        storage_path = os.path.join(storage_path, "model")
+
+        if as_hdf5:
+            storage_path = os.path.join(storage_path, "model.h5")
+        else:
+            storage_path = os.path.join(storage_path, "model")
         self.model.save(storage_path)
         return storage_path
 
