@@ -217,7 +217,7 @@ def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
 
             if not dry_run:
                 if cfg.general_config.save_model:
-                    storage_path = model.save_model(out_dir)
+                    storage_path = model.save_model(out_dir, True)
                     logger.info(f"Stored model: '{storage_path}'.")
                 common_eval_res.append_evaluation_results(eval_res)
                 res_out_path = eval_res.save(out_dir)
