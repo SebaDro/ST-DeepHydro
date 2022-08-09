@@ -309,6 +309,8 @@ training, validation and testing in your experiments.
 | _test.endDate_         | `string` | End of the testing period (ISO 8601 date string in the format yyyy-MM-dd)                                                             |
 
 ##### Model Parameters
+The `model` configuration section contains several parameters that define the model architecture and control the
+training process.
 
 | Config Parameter | Type      | Description                                                                                                                                                                                                                                                                                                                                                                                     |
 |------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
