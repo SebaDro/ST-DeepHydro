@@ -261,7 +261,14 @@ cnn:
 ## How to use
 ### Training
 Model training and evaluating for multiple basins can be simply performed by using the _run_training_ command line tool.
-This tool will be automatically available in your environment when installing this package. 
+This tool will be automatically available in your environment when installing this package.
+
+Just run `python.exe .\run_training.py .\config\your-training-config.yml` to perform training according to your own
+configuration.
+
+For testing purposes you can add the `--dryrun` flag to this call: `python.exe .\run_training.py --dryrun .\config\your-training-config.yml`.
+This causes no results such as model checkpoints or evaluation metrics to be stored during the run.
+
 #### Data preparation
 To train a model, one of the supported datasets mentioned in the [Data section](#data) is required. So, before you
 start with model training, make sure that you have properly prepared all the datasets you want to use for training:
