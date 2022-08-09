@@ -59,4 +59,3 @@ general:
   outputDir: "./output"
   saveModel: true
   saveCheckpoints: true
-

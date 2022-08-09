@@ -182,7 +182,7 @@ class ModelConfig:
     offset: int:
         Prediction offset for the target variable(s)
     loss: List of str
-        List loss functions to use for training
+        List of loss functions to use for training
     metrics: List of str
         List of metrics for validation and evaluation
     optimizer: str

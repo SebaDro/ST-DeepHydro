@@ -1,3 +1,9 @@
+general:
+  logTensorboardEvents: true
+  name: "convlstm"
+  outputDir: "./output"
+  saveModel: true
+  saveCheckpoints: true
 data:
   basinsFile: "./config/basins.txt"
   forcings:
@@ -44,10 +50,3 @@ model:
         - 8
         - 16
         - 32
-general:
-  logTensorboardEvents: true
-  name: "convlstm"
-  outputDir: "./output"
-  saveModel: true
-  saveCheckpoints: true
-
