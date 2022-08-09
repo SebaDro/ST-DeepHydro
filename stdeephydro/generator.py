@@ -114,8 +114,8 @@ class HydroMeteorologicalTimeseriesGenerator(Sequence):
 
     def __getitem__(self, idx):
         df_batch = self.idx_dict[idx * self.batch_size:(idx + 1) * self.batch_size]
-        input_lists = [[]] * len(self.xds_list)
-        # for xds in self.xds_list:
+        input_lists = [[] for _ in self.xds_list]
+        # for _ in self.xds_list:
         #     input_lists.append([])
         target_list = []
 
