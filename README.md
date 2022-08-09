@@ -53,16 +53,16 @@ python3 -m pip install -e .
 The installation also makes a bash script (_run_training_) available within your environment.
 
 ## Data
-The ST-DeepHydro library mainly focuses on training models for rainfall runoff predictions by using hydro-meteorological
+The ST-DeepHydro library mainly focuses on training models for rainfall runoff predictions by using hydrometeorological
 datasets. For this purpose, a variety of datasets are suitable to be used as training data. Though, especially CAMELS-US
 and Daymet datasets has been widely proven as appropriate input datasets for hydrological modelling.
 
-For loading different types of hydro-meteorological datasets the [stdeephydro.dataloader](./stdeephydro/dataloader.py)
+For loading different types of hydrometeorological datasets the [stdeephydro.dataloader](./stdeephydro/dataloader.py)
 module comes with various dataloader implementations.
 
 
 ### CAMELS-US
-The CAMELS-US dataset contains hydro-meteorological timeseries data for 671 basins in the continuous United States [[2]](#2).
+The CAMELS-US dataset contains hydrometeorological timeseries data for 671 basins in the continuous United States [[2]](#2).
 Meteorological products contain basin aggregated daily forcings from three different data sources (Daymet, Maurer and NLDAS). 
 Daily streamflow data for 671 gauges comes from the United States Geological Survey National Water Information System.
 You simply can download this large-sample dataset from the [NCAR website](https://ral.ucar.edu/solutions/products/camels).
@@ -88,14 +88,14 @@ based on the Deep Learning framework Tensorflow. Although, these networks are in
 in river catchments, other hydrological modelling use-cases are conceivable. Model types comprise lumped and distributed
 models. While lumped models are trained on aggregated meteorological timeseries data, distributed models have a special
 focus on learning spatio-temporal catchment processes. This makes them suitable to be trained on spatio-temporal 
-hydro-meteorological datasets, i.e. timeseries of raster data.
+hydrometeorological datasets, i.e. timeseries of raster data.
 
 The [stdeephydro.models](./stdeephydro/models.py) module contains all model implementations. Here, you will find a
 variety of Tensorflow models for different use cases and data types.
 
 ### LSTM
 `stdeephydro.models.LstmModel` builds a classical LSTM model, which is able to learn hydrological processes within
-catchment areas from aggregated hydro-meteorological input datasets. The model is applicable for rainfall-runoff
+catchment areas from aggregated hydrometeorological input datasets. The model is applicable for rainfall-runoff
 timeseries forecasting by predicting gauge streamflow.
 
 The Tensorflow model comprises one or more stacked (hidden) LSTM layers with a fully connected layer on top for
@@ -122,10 +122,11 @@ params:
 ```
 
 ### CNN-LSTM 
-`stdeephydro.models.CnnLstmModel` builds a combination of Convolutional Neural Network (CNN) and Long short-term memory
-(LSTM) Tensorflow model. The neural network architecture addresses needs to learn spatio-temporal processes within
-catchments from spatially distributed (raster-based) timeseries data. Therefore, this model type can be trained on 
-meteorological raster data to forecast gauge streamflow or any other hydrological variables within river catchments. 
+`stdeephydro.models.CnnLstmModel` builds a combination of [Convolutional Neural Network (CNN)](https://www.tensorflow.org/api_docs/python/tf/keras/layers/Conv2D)
+and [Long short-term memory (LSTM)](https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTM) Tensorflow model.
+The neural network architecture addresses needs to learn spatio-temporal processes within catchments from spatially
+distributed (raster-based) timeseries data. Therefore, this model type can be trained on meteorological raster data to
+forecast gauge streamflow or any other hydrological variables within river catchments. 
 
 The idea of this model architecture is to extract features from a timeseries of 2-dimensional raster data by convolutional
 operations at first. The extracted timeseries features then are passed to a stack of LSTM layer to predict one
@@ -162,10 +163,11 @@ params:
 ```
 
 ### Multi Input CNN-LSTM
-The `stdeephydro.models.MultiInputCnnLstmModel` class concatenates a combination of Convolutional Neural Network (CNN) and Long short-term
-memory (LSTM), CNN-LSTM, with a classical LSTM Tensorflow model. With this architecture design the neural network is 
-able to process two input datasets that differ in its spatio-temporal dimensions. Hence, it is possible to train the
-model with lumped meteorological long-term timeseries data as well as spatially-distributed short-term raster data. 
+The `stdeephydro.models.MultiInputCnnLstmModel` class concatenates a combination of Convolutional Neural Network (CNN)
+and Long short-term memory (LSTM), CNN-LSTM, with a classical LSTM Tensorflow model. With this architecture design the
+neural network is able to process two input datasets that differ in its spatio-temporal dimensions. Hence, it is possible
+to train the model with lumped meteorological long-term timeseries data as well as spatially-distributed short-term raster
+data. 
 
 The idea of this model is to enhance the capability of a classical LSTM model to predict target variables from
 one-dimensional timeseries data but also considering spatial distributed timeseries data that are processed by a
@@ -204,9 +206,11 @@ params:
 ```
 
 ### ConvLSTM
-The `stdeephydro.models.ConvLstmModel` class builds Convolutional LSTM Tensorflow model. This architecture is able to predict one or more
-target variables based on spatially distributed timeseries data. The neural network processes timeseries of raster data
-with a stack of LSTM layers that perform convolutional operations by using input-to-state and state-to-state transitions.
+The `stdeephydro.models.ConvLstmModel` class builds a Convolutional LSTM model that maily builds up on
+[Tensorflow ConvLSTM2D layers](https://www.tensorflow.org/api_docs/python/tf/keras/layers/ConvLSTM2D). This architecture
+is able to predict one or more target variables based on spatially distributed timeseries data. The neural network
+processes timeseries of raster data with a stack of LSTM layers that perform convolutional operations by using
+input-to-state and state-to-state transitions.
 
 Up to now, the ConvLSTM model can be trained on meteorological raster data to predict one-dimensional or any other
 hydrological variables, such as the CNN-LSTM model can do. However, originally ConvLSTM layers are intended for building
@@ -231,10 +235,11 @@ cnn:
 ```
 
 ### Conv3D
-The `stdeephydro.models.Conv3DModel` builds Tensorflow model based multiple stacked Conv3D and MaxPooling3D layers.
-Usually, intended to process video data, it applies convolutional and max pooling operations on the spatial as well as
-the temporal dimension of the input data. The model can be trained on a timeseries of meteorological raster data
-to predict gauge streamflow or any other hydrological variables.
+The `stdeephydro.models.Conv3DModel` builds a Tensorflow model based multiple stacked [Conv3D](https://www.tensorflow.org/api_docs/python/tf/keras/layers/Conv3D)
+and [MaxPooling3D](https://www.tensorflow.org/api_docs/python/tf/keras/layers/MaxPool3D) layers. Usually, intended to
+process video data, it applies convolutional and max pooling operations on the spatial as well as the temporal dimension
+of the input data. The model can be trained on a timeseries of meteorological raster data to predict gauge streamflow or
+any other hydrological variables.
 
 #### Conv3D Attributes:
 Required values for `cfg.params`:
@@ -285,13 +290,38 @@ General configuration parameters must be defined under the `general`key:
 | _logTensorboardEvents_ | `boolean` | Indicates whether to log events during training for Tensorboard or not.                                                    |
 
 ##### Data Parameters
-TBD
+The `data` key contains several definitions for the hydrometeorological datasets, which should be used for model 
+training, validation and testing in your experiments.
+
+| Config Parameter       | Type     | Description                                                                                                                           |
+|------------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------|
+| _forcings.dir_         | `string` | Path to a directory, which contains forcings datasets.                                                                                |
+| _forcings.type_        | `string` | Type of the forcings datasets. Currently supported: `daymet`, `camels-us`                                                             |
+| _forcings.variables_   | `array`  | List of forcing variables, which should be considered for training the model                                                          |
+| _streamflow.dir_       | `string` | Path to a directory, which contains streamflow datasets.                                                                              |
+| _streamflow.type_      | `string` | Type of the forcings datasets. Currently supported: `camels-us`                                                                       |
+| _streamflow.variables_ | `array`  | List of streamflow variables, which should be considered for training the model. Actually, only one variable is supported, up to now. |
+| _training.startDate_   | `string` | Start of the training period (ISO 8601 date string in the format yyyy-MM-dd)                                                          |
+| _training.endDate_     | `string` | End of the training period (ISO 8601 date string in the format yyyy-MM-dd)                                                            |
+| _validation.startDate_ | `string` | Start of the validation period (ISO 8601 date string in the format yyyy-MM-dd)                                                        |
+| _validation.endDate_   | `string` | End of the validation period (ISO 8601 date string in the format yyyy-MM-dd)                                                          |
+| _test.startDate_       | `string` | Start of the testing period (ISO 8601 date string in the format yyyy-MM-dd)                                                           |
+| _test.endDate_         | `string` | End of the testing period (ISO 8601 date string in the format yyyy-MM-dd)                                                             |
 
 ##### Model Parameters
-TBD
 
-### ST-DeepHydro API
-TBD
+| Config Parameter | Type      | Description                                                                                                                                                                                                                                                                                                                                                                                     |
+|------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| _type_           | `string`  | Name of the model type that will be trained. Currently supported: `lstm`, `cnn-lstm`, `multi-cnn-lstm`, `convlstm`, `conv3d`                                                                                                                                                                                                                                                                    |
+| _timesteps_      | `array`   | Timesteps that will be used for creating the input (forcings) timeseries windows. E.g., if timesteps are 10, the last 10 days of forcings values will be used as inputs for model training to predict the target variable with a defined offset. If you train a model that accepts multiple inputs, such as as the `multi-cnn-lstm` model, you have to define a timesteps value for each input. |
+| _offset_         | `int`     | Offset between inputs (forcings) and target (streamflow). An offset of 1 means that forcings for the last n-days will be taken as input and the streamflow for n + 1 will be taken as target.                                                                                                                                                                                                   |
+| _loss_           | `array`   | List of loss functions to use for training. Name of the used loss functions must refer to [Tensorflow supported loss functions](https://www.tensorflow.org/api_docs/python/tf/keras/losses).                                                                                                                                                                                                    |
+| _metrics_        | `array`   | List of metrics used for validation and evaluation. Name of the used metrics must refer to [Tensorflow supported metrics](https://www.tensorflow.org/api_docs/python/tf/keras/metrics).                                                                                                                                                                                                         |
+| _optimizer_      | `string`  | Defines an optimizer that will be used for training. Must be one of [Tensorflow supported optimizers](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers).                                                                                                                                                                                                                          |
+| _epochs_         | `int`     | Number of training epochs                                                                                                                                                                                                                                                                                                                                                                       |
+| _batchSize_      | `int`     | Batch size to use for training                                                                                                                                                                                                                                                                                                                                                                  |
+| _multiOutput_    | `boolean` | Indicates whether the model should predict multiple target variables at once or only one (currently, not supported)                                                                                                                                                                                                                                                                             |
+| _params_         | `dict`    | Additional model specific configuration parameters. Which parameters can be defined depends on the `type` parameter value. Supported parameters for each model type are listed in the [models section](#models)                                                                                                                                                                                 |
 
 ## References
 <a id="1">[1]</a>
@@ -300,7 +330,7 @@ hydrology. In: _Journal of Open Source Software_, 7(71), 4050. https://doi.org/1
 
 <a id="2">[2]</a>
 Newman, A., Sampson, K., Clark, M. P., Bock, A., Viger, R. J., Blodgett, D. (2014). _A large-sample
-watershed-scalehydrometeorological dataset for the contiguous USA_. Boulder, CO: UCAR/NCAR. https://dx.doi.org/10.5065/D6MW2F4D
+watershed-scale hydrometeorological dataset for the contiguous USA_. Boulder, CO: UCAR/NCAR. https://dx.doi.org/10.5065/D6MW2F4D
 
 <a id="3">[3]</a>
 Thornton, P.E., M.M. Thornton, B.W. Mayer, Y. Wei, R. Devarakonda, R.S. Vose, and R.B. Cook. 2016. _Daymet: Daily Surface
@@ -309,4 +339,3 @@ Weather Data on a 1-km Grid for North America, Version 3_. ORNL DAAC, Oak Ridge,
 <a id="4">[4]</a>
 Thornton, M.M., R. Shrestha, Y. Wei, P.E. Thornton, S. Kao, and B.E. Wilson. 2020. _Daymet: Daily Surface Weather Data 
 on a 1-km Grid for North America, Version 4_. ORNL DAAC, Oak Ridge, Tennessee, USA. https://doi.org/10.3334/ORNLDAAC/1840
-
