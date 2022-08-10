@@ -1,5 +1,6 @@
 general:
   logTensorboardEvents: true
+  loggingConfig: "./config/logging.yml"
   name: "convlstm"
   outputDir: "./output"
   saveModel: true

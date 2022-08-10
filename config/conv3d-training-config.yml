@@ -1,5 +1,6 @@
 general:
   logTensorboardEvents: true
+  loggingConfig: "./config/logging.yml"
   name: "conv3d"
   outputDir: "./output"
   saveModel: true
