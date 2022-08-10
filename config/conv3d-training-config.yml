@@ -1,6 +1,6 @@
 general:
   logTensorboardEvents: true
-  name: "convlstm"
+  name: "conv3d"
   outputDir: "./output"
   saveModel: true
   saveCheckpoints: true
@@ -30,7 +30,7 @@ data:
     startDate: "2010-01-01"
     endDate: "2014-12-31"
 model:
-  type: "convlstm"
+  type: "conv3d"
   timesteps:
     - 20
   offset: 1

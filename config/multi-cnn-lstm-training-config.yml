@@ -1,7 +1,21 @@
+general:
+  logTensorboardEvents: true
+  name: "multicnnlstm"
+  outputDir: "./output"
+  saveModel: true
+  saveCheckpoints: true
 data:
   basinsFile: "./config/basins.txt"
   forcings:
-    - dir: "./data/forcings"
+    - dir: "./data/forcings-aggregated"
+      type: "daymet"
+      variables:
+        - "prcp"
+        - "tmin"
+        - "tmax"
+        - "srad"
+        - "vp"
+    - dir: "./data/forcings-2d"
       type: "daymet"
       variables:
         - "prcp"
@@ -24,7 +38,7 @@ data:
     startDate: "2010-01-01"
     endDate: "2014-12-31"
 model:
-  type: "cnn-lstm"
+  type: "multi-cnn-lstm"
   timesteps:
     - 100
     - 20
@@ -53,9 +67,3 @@ model:
       dropout:
         - 0.1
         - 0
-general:
-  logTensorboardEvents: true
-  name: "cnnlstm"
-  outputDir: "./output"
-  saveModel: true
-  saveCheckpoints: true
