@@ -87,7 +87,7 @@ class Evaluation:
     def ds_results(self):
         return self.__ds_results
 
-    def append_evaluation_results(self, eval):
+    def append_evaluation_results(self, ds):
         """
         Appends new evaluation results to the existing ones
 
@@ -97,12 +97,12 @@ class Evaluation:
             Dataset containing aligned observation and prediction timeseries data as well as basin indexed NSE metrics
 
         """
-        if isinstance(eval, xr.Dataset):
-            self.__ds_results = xr.merge([self.__ds_results, eval])
-        elif isinstance(eval, Evaluation):
-            self.__ds_results = xr.merge([self.__ds_results, eval.ds_results])
+        if isinstance(ds, xr.Dataset):
+            self.__ds_results = xr.merge([self.__ds_results, ds])
+        elif isinstance(ds, Evaluation):
+            self.__ds_results = xr.merge([self.__ds_results, ds.ds_results])
         else:
-            raise ValueError(f"Unsupported evaluation result type: {type(eval)}.")
+            raise ValueError(f"Unsupported evaluation result type: {type(ds)}.")
 
     def save(self, out_dir: str, pref: str = None) -> str:
         """
@@ -123,5 +123,5 @@ class Evaluation:
         """
         name = "prediction.nc" if pref is None else f"{pref}_prediction.nc"
         out_path = os.path.join(out_dir, name)
-        self.ds_results.to_netcdf(out_path)
+        self.ds_results.to_netcdf(out_path, engine="h5netcdf")
         return out_path
