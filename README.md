@@ -288,13 +288,15 @@ In addition, this section describes all configuration parameters that are suppor
 ##### General Parameters
 General configuration parameters must be defined under the `general`key:  
 
-| Config Parameter       | Type      | Description                                                                                                                |
-|------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------|
-| _name_                 | `string`  | Name of the experiment. This name will be used for prefixing some of the outputs.                                          |
-| _outputDir_            | `string`  | Path to a directory, which will be used for storing outputs such as the trained model, checkpoints and evaluation results. |
-| _saveCheckpoints_      | `boolean` | Indicates whether to save training checkpoints or not.                                                                     |
-| _saveModel_            | `boolean` | Indicates whether to store the trained model or not.                                                                       |
-| _logTensorboardEvents_ | `boolean` | Indicates whether to log events during training for Tensorboard or not.                                                    |
+| Config Parameter       | Type      | Description                                                                                                                                                                                          |
+|------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| _name_                 | `string`  | Name of the experiment. This name will be used for prefixing some of the outputs.                                                                                                                    |
+| _logTensorboardEvents_ | `boolean` | Indicates whether to log events during training for Tensorboard or not.                                                                                                                              |
+| _loggingConfig_        | `string`  | Path to a logging configuration file. This must be a YAML file according to the [Python logging dictionary schema](https://docs.python.org/3/library/logging.config.html#logging-config-dictschema). |
+| _outputDir_            | `string`  | Path to a directory, which will be used for storing outputs such as the trained model, checkpoints and evaluation results.                                                                           |
+| _saveCheckpoints_      | `boolean` | Indicates whether to save training checkpoints or not.                                                                                                                                               |
+| _saveModel_            | `boolean` | Indicates whether to store the trained model or not.                                                                                                                                                 |
+
 
 ##### Data Parameters
 The `data` key contains several definitions for the hydrometeorological datasets, which should be used for model 
