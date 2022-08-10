@@ -6,10 +6,6 @@ import yaml
 from stdeephydro import config
 from stdeephydro import training
 
-with open("./config/logging.yml", "r") as stream:
-    log_config = yaml.load(stream, Loader=yaml.FullLoader)
-    logging.config.dictConfig(log_config)
-
 
 def read_args():
     parser = argparse.ArgumentParser(description='Download some Daymet files.')
@@ -22,24 +18,30 @@ def read_args():
     return args
 
 
+def setup_logging(logging_config_path: str):
+    with open(logging_config_path, "r") as stream:
+        log_config = yaml.load(stream, Loader=yaml.FullLoader)
+        logging.config.dictConfig(log_config)
+
+
 def main():
     args = read_args()
     config_path = args.config
     dry_run = args.dryrun
-
-    logging.info("Start run_training.py" if not dry_run else "Start run_training.py in dry run mode.")
-    logging.info(f"Read config from path '{config_path}'")
 
     try:
         cfg_dict = config.read_config(config_path)
         if cfg_dict is None:
             logging.error("Configuration could not be loaded or is invalid. Training will be stopped.")
         else:
-            logging.debug(f"Config: '{cfg_dict}'")
             cfg = config.Config.from_dict(cfg_dict)
-            training.run_training_and_evaluation(cfg, dry_run)
+            setup_logging(cfg.general_config.logging_config)
+            logging.info("Start run_training.py" if not dry_run else "Start run_training.py in dry run mode.")
+            logging.info(f"Run training with config from path '{config_path}'")
+            logging.debug(f"Config: '{cfg_dict}'")
 
-        logging.info("Finished run_training.py")
+            training.run_training_and_evaluation(cfg, dry_run)
+            logging.info("Finished run_training.py")
     except config.ConfigError:
         logging.exception("Could not create configuration. Training will be stopped.")
 

@@ -27,14 +27,17 @@ class GeneralConfig:
     log_tensorboard_events: bool
         Indicates whether to log events during training for Tensorboard analysis. If true,
         tf.keras.callbacks.TensorBoard is used for model training
+    logging_config: str
+        Path to a logging configuration file
     """
 
-    def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events):
+    def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events, logging_config):
         self.__name = name
         self.__output_dir = output_dir
         self.__save_checkpoints = save_checkpoints
         self.__save_model = save_model
         self.__log_tensorboard_events = log_tensorboard_events
+        self.__logging_config = logging_config
 
     @property
     def name(self):
@@ -55,6 +58,10 @@ class GeneralConfig:
     @property
     def log_tensorboard_events(self):
         return self.__log_tensorboard_events
+
+    @property
+    def logging_config(self):
+        return self.__logging_config
 
 
 class DatasetConfig:
@@ -321,7 +328,7 @@ def create_general_config(cfg: dict) -> GeneralConfig:
 
     """
     return GeneralConfig(cfg["name"], cfg["outputDir"], cfg["saveModel"], cfg["saveCheckpoints"],
-                         cfg["logTensorboardEvents"])
+                         cfg["logTensorboardEvents"], cfg["loggingConfig"])
 
 
 def create_dataset_config(cfg: dict) -> DatasetConfig:
