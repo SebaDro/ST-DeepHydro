@@ -321,8 +321,9 @@ def load_forcings_daymet_2d(path: str) -> xr.Dataset:
         Dataset hat contains 2-dimensional Daymet forcings data
 
     """
-    with xr.open_dataset(path, engine="h5netcdf") as ds:
-        return ds
+    with xr.open_dataset(path, engine="h5netcdf") as xds:
+        xds = check_and_prepare_coordinates(xds)
+        return xds
 
 
 def load_multiple_forcings_daymet_2d(file_paths: list) -> xr.Dataset:
@@ -340,8 +341,9 @@ def load_multiple_forcings_daymet_2d(file_paths: list) -> xr.Dataset:
         Dataset hat contains 2-dimensional Daymet forcings data
 
     """
-    with xr.open_mfdataset(file_paths, engine="h5netcdf") as ds:
-        return ds
+    with xr.open_mfdataset(file_paths, engine="h5netcdf") as xds:
+        xds = check_and_prepare_coordinates(xds)
+        return xds
 
 
 def load_forcings_daymet_2d_from_zarr(store_dir: str) -> xr.Dataset:
@@ -359,8 +361,38 @@ def load_forcings_daymet_2d_from_zarr(store_dir: str) -> xr.Dataset:
         Dataset hat contains 2-dimensional Daymet forcings data
 
     """
-    with xr.open_zarr(store_dir) as ds:
-        return ds
+    with xr.open_zarr(store_dir) as xds:
+        xds = check_and_prepare_coordinates(xds)
+        return xds
+
+
+def check_and_prepare_coordinates(xds: xr.Dataset):
+    """
+    Checks if all required coordinate dimensions are present and drops all unnecessary coordinates.
+
+    Parameters
+    ----------
+    xds: xarray.Dataset
+        The dataset which will be prepared
+
+    Returns
+    -------
+    xarray.Dataset
+        A cleaned up dataset that is indexed with only required coordinate dimensions
+
+    """
+    if all(i in xds.coords for i in ["time", "y", "x"]):
+        coords = {"time", "y", "x"}
+        diffs = list(set(xds.coords) - coords)
+        xds = xds.drop_vars(diffs)
+    elif all(i in xds.coords for i in ["time"]):
+        coords = {"time"}
+        diffs = list(set(xds.coords) - coords)
+        xds = xds.drop_vars(diffs)
+    else:
+        raise ValueError(f"Coordinates should contain one of the sets: ['time'],"
+                         f"['time', 'y', 'x']. Actual coordinates are: {list(xds.coords)}")
+    return xds
 
 
 def load_streamflow(path: str, ds_type: str):
