@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.HydroDataLoader],
-                         processor_list: List[processing.AbstractProcessor], basin: str)\
+                         processor_list: List[processing.AbstractProcessor], basin: str, out_dir: str, dry_run: bool)\
         -> Tuple[List[dataset.HydroDataset], List[dataset.HydroDataset], List[dataset.HydroDataset]]:
     """
     Performs data loading and data preprocessing steps for training, validation and test data
@@ -31,7 +31,10 @@ def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.H
         Used for processing training, validation and test datasets
     basin: List of str
         List of basin IDs
-
+    out_dir: str
+        Path to the working directory, which will be used to persist scaling parameters.
+    dry_run: bool
+        Indicates a dry run. If true, scaling parameters of a fitted processor won't be stored.
     Returns
     -------
     Tuple[List[dataset.HydroDataset], List[dataset.HydroDataset], List[dataset.HydroDataset]]
@@ -63,6 +66,11 @@ def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.H
             processor = processor_list[i]
             logger.info(f"Preprocess datasets using '{type(processor)}'.")
             processor.fit(ds_train)
+            if not dry_run:
+                processor.scaling_params[0].to_netcdf(os.path.join(out_dir, f"scaling_params_{i:02d}_min.nc"),
+                                                      engine="h5netcdf")
+                processor.scaling_params[1].to_netcdf(os.path.join(out_dir, f"scaling_params_{i:02d}_max.nc"),
+                                                      engine="h5netcdf")
             ds_train_list.append(processor.process(ds_train))
             ds_validation_list.append(processor.process(ds_validation))
             ds_test_list.append(processor.process(ds_test))
@@ -211,9 +219,11 @@ def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
             out_dir = os.path.join(work_dir, basin)
         try:
             logger.info(f"Prepare data for basin {basin}.")
-            ds_train_list, ds_validation_list, ds_test_list = run_data_preparation(cfg, data_loader_list, processor_list, basin)
+            ds_train_list, ds_validation_list, ds_test_list = run_data_preparation(cfg, data_loader_list, processor_list,
+                                                                                   basin, out_dir, dry_run)
             model = run_model_training(cfg, ds_train_list, ds_validation_list, out_dir)
-            eval_res = run_evaluation(model, ds_test_list, processor_list, cfg.data_config.streamflow_cfg.variables[0], basin)
+            eval_res = run_evaluation(model, ds_test_list, processor_list, cfg.data_config.streamflow_cfg.variables[0],
+                                      basin)
 
             if not dry_run:
                 if cfg.general_config.save_model:
