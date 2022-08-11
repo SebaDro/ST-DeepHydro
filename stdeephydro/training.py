@@ -217,6 +217,8 @@ def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
         out_dir = None
         if work_dir is not None:
             out_dir = os.path.join(work_dir, basin)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
         try:
             logger.info(f"Prepare data for basin {basin}.")
             ds_train_list, ds_validation_list, ds_test_list = run_data_preparation(cfg, data_loader_list, processor_list,

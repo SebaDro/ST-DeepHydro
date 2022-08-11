@@ -93,7 +93,7 @@ class Evaluation:
 
         Parameters
         ----------
-        ds: xarray.Dataset
+        ds: Union[xarray.Dataset, Evaluation]
             Dataset containing aligned observation and prediction timeseries data as well as basin indexed NSE metrics
 
         """
