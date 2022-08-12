@@ -5,6 +5,9 @@ import yaml
 
 from stdeephydro import config
 from stdeephydro import training
+from stdeephydro import utils
+
+import os
 
 
 def read_args():
@@ -39,7 +42,8 @@ def main():
             logging.info("Start run_training.py" if not dry_run else "Start run_training.py in dry run mode.")
             logging.info(f"Run training with config from path '{config_path}'")
             logging.debug(f"Config: '{cfg_dict}'")
-
+            if cfg.general_config.seed is not None:
+                utils.setup_reproducibility(cfg.general_config.seed)
             training.run_training_and_evaluation(cfg, dry_run)
             logging.info("Finished run_training.py")
     except config.ConfigError:

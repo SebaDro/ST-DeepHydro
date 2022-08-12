@@ -31,13 +31,15 @@ class GeneralConfig:
         Path to a logging configuration file
     """
 
-    def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events, logging_config):
+    def __init__(self, name, output_dir, save_checkpoints, save_model, log_tensorboard_events, logging_config,
+                 seed=None):
         self.__name = name
         self.__output_dir = output_dir
         self.__save_checkpoints = save_checkpoints
         self.__save_model = save_model
         self.__log_tensorboard_events = log_tensorboard_events
         self.__logging_config = logging_config
+        self.__seed = seed
 
     @property
     def name(self):
@@ -62,6 +64,10 @@ class GeneralConfig:
     @property
     def logging_config(self):
         return self.__logging_config
+
+    @property
+    def seed(self):
+        return self.__seed
 
 
 class DatasetConfig:
@@ -327,8 +333,9 @@ def create_general_config(cfg: dict) -> GeneralConfig:
         Object containing general config parameters that
 
     """
+    seed = cfg["seed"] if "seed" in cfg else None
     return GeneralConfig(cfg["name"], cfg["outputDir"], cfg["saveModel"], cfg["saveCheckpoints"],
-                         cfg["logTensorboardEvents"], cfg["loggingConfig"])
+                         cfg["logTensorboardEvents"], cfg["loggingConfig"], seed)
 
 
 def create_dataset_config(cfg: dict) -> DatasetConfig:
