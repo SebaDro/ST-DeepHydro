@@ -296,6 +296,7 @@ General configuration parameters must be defined under the `general`key:
 | _outputDir_            | `string`  | Path to a directory, which will be used for storing outputs such as the trained model, checkpoints and evaluation results.                                                                           |
 | _saveCheckpoints_      | `boolean` | Indicates whether to save training checkpoints or not.                                                                                                                                               |
 | _saveModel_            | `boolean` | Indicates whether to store the trained model or not.                                                                                                                                                 |
+| _seed_                 | `int`     | Set a fixed seed, which e.g. affects weight initialization in order to achieve reproducibility. If this parameter is not set, a random seed will be used.                                            |
 
 
 ##### Data Parameters
