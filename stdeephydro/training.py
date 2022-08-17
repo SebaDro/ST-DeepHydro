@@ -1,5 +1,6 @@
 import logging
 import os
+import numpy as np
 
 from stdeephydro import common
 from stdeephydro import config
@@ -55,14 +56,24 @@ def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.H
     ds_test_list = []
     try:
         for i, data_loader in enumerate(data_loader_list):
+            # Load and check training dataset
             ds_train = data_loader.load_single_dataset(cfg.data_config.training_cfg.start_date,
                                                        cfg.data_config.training_cfg.end_date,
                                                        basin)
+            check_dataset_for_validity(ds_train, "training", cfg.data_config.streamflow_cfg.variables[0],
+                                       cfg.model_config.timesteps[i])
+            # Load and check validation dataset
             ds_validation = data_loader.load_single_dataset(cfg.data_config.validation_cfg.start_date,
                                                             cfg.data_config.validation_cfg.end_date,
                                                             basin)
+            check_dataset_for_validity(ds_validation, "validation", cfg.data_config.streamflow_cfg.variables[0],
+                                       cfg.model_config.timesteps[i])
+            # Load and check test dataset
             ds_test = data_loader.load_single_dataset(cfg.data_config.test_cfg.start_date,
                                                       cfg.data_config.test_cfg.end_date, basin)
+            check_dataset_for_validity(ds_test, "test", cfg.data_config.streamflow_cfg.variables[0],
+                                       cfg.model_config.timesteps[i])
+            # Preprocess all datasets
             processor = processor_list[i]
             logger.info(f"Preprocess datasets using '{type(processor)}'.")
             processor.fit(ds_train)
@@ -83,6 +94,15 @@ def run_data_preparation(cfg: config.Config, data_loader_list: List[dataloader.H
         raise common.DataPreparationError("Error during data preparation due to an incorrect value type.") from e
     except IOError as e:
         raise common.DataPreparationError("Error during data preparation while trying to read a file.") from e
+
+
+def check_dataset_for_validity(ds: dataset.HydroDataset, ds_type: str, variable: str, timesteps: int):
+    # Check if there are enough values for the number of timesteps used for training/evaluating dataset generation
+    non_nan_values = (~np.isnan(ds.timeseries.streamflow.values)).sum()
+    if non_nan_values <= timesteps:
+        raise common.DataPreparationError(f"Dataset '{ds_type}' does not contain enough '{variable}' values. At least "
+                                          f"it should contain {timesteps} values but actually there are only "
+                                          f"{non_nan_values}.")
 
 
 def run_model_training(cfg: config.Config, ds_train_list: List[dataset.HydroDataset],
