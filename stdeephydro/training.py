@@ -161,21 +161,24 @@ def run_evaluation(model, ds_test_list: List[dataset.HydroDataset], processor_li
 
     """
     logger.info("Start evaluating model...")
-    ds_prediction = model.predict(ds_test_list, basin, as_dataset=True, remove_nan=False)
-    result = model.evaluate(ds_test_list, True, basin)
+    try:
+        ds_prediction = model.predict(ds_test_list, basin, as_dataset=True, remove_nan=False)
+        result = model.evaluate(ds_test_list, True, basin)
 
-    # Rescale predictions and observation to the origin uom
-    processor = processor_list[0]
-    ds_prediction = processor.rescale(ds_prediction)
-    ds_observation = processor.rescale(ds_test_list[0].timeseries)
+        # Rescale predictions and observation to the origin uom
+        processor = processor_list[0]
+        ds_prediction = processor.rescale(ds_prediction)
+        ds_observation = processor.rescale(ds_test_list[0].timeseries)
 
-    ds_eval = evaluation.calc_evaluation(ds_observation, ds_prediction, target_var, basin)
+        ds_eval = evaluation.calc_evaluation(ds_observation, ds_prediction, target_var, basin)
 
-    eval_res = evaluation.Evaluation()
-    eval_res.append_evaluation_results(result)
-    eval_res.append_evaluation_results(ds_eval)
-    logger.info(f"Finished evaluating model. NSE={eval_res.ds_results.sel(basin=basin).nse.values}")
-    return eval_res
+        eval_res = evaluation.Evaluation()
+        eval_res.append_evaluation_results(result)
+        eval_res.append_evaluation_results(ds_eval)
+        logger.info(f"Finished evaluating model. NSE={eval_res.ds_results.sel(basin=basin).nse.values}")
+        return eval_res
+    except ValueError as e:
+        raise common.EvaluationError("Error during model evaluation due to an incorrect value.") from e
 
 
 def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
@@ -244,7 +247,7 @@ def run_training_and_evaluation(cfg: config.Config, dry_run: bool):
             logger.exception(f"Training stopped for basin {basin} due to an unexpected error that occurred during"
                              f" fitting the model.")
         except common.EvaluationError:
-            logger.exception(f"Training stopped for basin {basin} due to an unexpected error that occurred during"
+            logger.exception(f"Evaluation stopped for basin {basin} due to an unexpected error that occurred during"
                              f" evaluating the model.")
     if not dry_run:
         res_out_path = common_eval_res.save(work_dir)
